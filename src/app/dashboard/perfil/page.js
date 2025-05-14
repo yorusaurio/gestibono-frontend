@@ -16,8 +16,6 @@ export default function PerfilPage() {
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     reset,
     formState: { errors, isDirty, isSubmitSuccessful }
   } = useForm({

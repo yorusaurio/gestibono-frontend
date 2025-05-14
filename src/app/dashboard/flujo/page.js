@@ -2,7 +2,6 @@
 'use client'
 
 import FormularioBono from '@/components/FormularioBono'
-import FormularioBono2 from '@/components/FormularioBono2'
 
 
 export default function FlujoPage() {

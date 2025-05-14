@@ -104,7 +104,7 @@ export default function DashboardHome() {
         <div className="bg-white p-6 rounded-lg shadow border">
           <h3 className="text-lg font-semibold text-gray-800 mb-2">Agregar nuevo bono</h3>
           <p className="text-gray-700 mb-4">Dirígete al formulario para registrar un nuevo flujo de bono con método alemán.</p>
-          <a href="/flujo" className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          <a href="/dashboard/flujo" className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
             Ir al formulario
           </a>
         </div>
@@ -112,7 +112,7 @@ export default function DashboardHome() {
         <div className="bg-white p-6 rounded-lg shadow border">
           <h3 className="text-lg font-semibold text-gray-800 mb-2">Ver gráficos</h3>
           <p className="text-gray-700 mb-4">Explora visualmente la evolución del flujo financiero y la amortización.</p>
-          <a href="/graficos" className="inline-block bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+          <a href="/dashboard/graficos" className="inline-block bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
             Ver gráficos
           </a>
         </div>

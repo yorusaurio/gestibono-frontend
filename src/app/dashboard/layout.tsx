@@ -11,7 +11,11 @@ import {
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline'
 
-export default function DashboardLayout({ children }) {
+interface DashboardLayoutProps {
+  children: React.ReactNode
+}
+
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [nombre, setNombre] = useState('')

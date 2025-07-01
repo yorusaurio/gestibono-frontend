@@ -1,47 +1,47 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
 export default function TablaResultados() {
-  const datos = [
-    {
-      periodo: 1,
-      fecha_pago: '2025-06-01',
-      saldo_inicial: 10000,
-      interes: 500,
-      amortizacion: 1000,
-      cuota_total: 1500,
-      saldo_final: 9000,
-      flujo_emisor: -1500,
-      flujo_inversionista: 1450,
-      flujo_descuento: 1387.65
-    },
-    {
-      periodo: 2,
-      fecha_pago: '2025-12-01',
-      saldo_inicial: 9000,
-      interes: 450,
-      amortizacion: 1000,
-      cuota_total: 1450,
-      saldo_final: 8000,
-      flujo_emisor: -1450,
-      flujo_inversionista: 1400,
-      flujo_descuento: 1305.22
+  const [datos, setDatos] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const calculoBono = sessionStorage.getItem('calculoBono')
+    if (calculoBono) {
+      const datos = JSON.parse(calculoBono)
+      setDatos(datos.resultados || [])
     }
-    // Más filas reales luego...
-  ]
+    setLoading(false)
+  }, [])
 
   const headers = [
     { key: 'periodo', label: 'Período' },
-    { key: 'fecha_pago', label: 'Fecha de Pago' },
-    { key: 'saldo_inicial', label: 'Saldo Inicial' },
-    { key: 'interes', label: 'Interés' },
+    { key: 'saldoInicial', label: 'Saldo Inicial' },
+    { key: 'intereses', label: 'Interés' },
     { key: 'amortizacion', label: 'Amortización' },
-    { key: 'cuota_total', label: 'Cuota Total' },
-    { key: 'saldo_final', label: 'Saldo Final' },
-    { key: 'flujo_emisor', label: 'Flujo Emisor' },
-    { key: 'flujo_inversionista', label: 'Flujo Inversionista' },
-    { key: 'flujo_descuento', label: 'Flujo Descontado' }
+    { key: 'cuota', label: 'Cuota Total' },
+    { key: 'saldoFinal', label: 'Saldo Final' }
   ]
 
   const formatoMoneda = (valor) =>
-    typeof valor === 'number' ? `S/ ${valor.toFixed(2)}` : valor
+    typeof valor === 'number' ? `S/ ${valor.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : valor
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600">Cargando resultados...</p>
+      </div>
+    )
+  }
+
+  if (datos.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600">No hay datos para mostrar. Por favor, complete el formulario primero.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="overflow-x-auto rounded-lg shadow">

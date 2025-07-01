@@ -6,8 +6,11 @@ export default function DashboardHome() {
   const [userName, setUserName] = useState('')
 
   useEffect(() => {
-    const user = JSON.parse(sessionStorage.getItem('user'))
-    if (user?.usuario) setUserName(user.usuario)
+    const userData = sessionStorage.getItem('user')
+    if (userData) {
+      const user = JSON.parse(userData)
+      if (user?.usuario) setUserName(user.usuario)
+    }
   }, [])
 
   return (

@@ -12,13 +12,38 @@ import {
   MapPinIcon
 } from '@heroicons/react/24/outline'
 
+// Tipos para el formulario
+interface FormData {
+  nombres: string
+  apellidos: string
+  dni: string
+  usuario: string
+  clave: string
+  ruc: string
+  tienda: string
+  razon_social: string
+  correo: string
+  telefono: string
+  direccion: string
+}
+
+interface FieldProps {
+  label: string
+  name: keyof FormData
+  placeholder?: string
+  icon: React.ComponentType<{ className?: string }>
+  type?: string
+  rules?: Record<string, unknown>
+  [key: string]: unknown
+}
+
 export default function PerfilPage() {
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isDirty, isSubmitSuccessful }
-  } = useForm({
+  } = useForm<FormData>({
     defaultValues: {
       nombres: '',
       apellidos: '',
@@ -42,7 +67,7 @@ export default function PerfilPage() {
     }
   }, [reset])
 
-  const onSubmit = (data) => {
+  const onSubmit = (data: FormData) => {
     sessionStorage.setItem('user', JSON.stringify(data))
   }
 
@@ -50,7 +75,7 @@ export default function PerfilPage() {
     'w-full border border-gray-300 pl-10 pr-3 py-2 rounded-md text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500'
   const labelClass = 'block text-sm font-medium text-gray-800 mb-1'
 
-  const Field = ({ label, name, placeholder, icon: Icon, type = 'text', rules = {}, ...rest }) => (
+  const Field = ({ label, name, placeholder, icon: Icon, type = 'text', rules = {}, ...rest }: FieldProps) => (
     <div className="relative">
       <label className={labelClass}>{label}</label>
       <Icon className="h-5 w-5 text-gray-400 absolute left-3 top-9" />

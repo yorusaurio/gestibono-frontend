@@ -1,0 +1,16 @@
+{
+  "testEnvironment": "node",
+  "testMatch": [
+    "**/src/**/*.test.js",
+    "**/src/**/*.test.ts"
+  ],
+  "moduleNameMapping": {
+    "^@/(.*)$": "<rootDir>/src/$1"
+  },
+  "transform": {
+    "^.+\\.(js|jsx|ts|tsx)$": ["babel-jest", {
+      "presets": ["next/babel"]
+    }]
+  },
+  "testTimeout": 30000
+}

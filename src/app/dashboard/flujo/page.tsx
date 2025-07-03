@@ -1,8 +1,6 @@
-// app/flujo/page.js
 'use client'
 
 import FormularioBono from '@/components/FormularioBono'
-
 
 export default function FlujoPage() {
   return (
@@ -12,7 +10,7 @@ export default function FlujoPage() {
         <p className="text-gray-700 mb-8">
           Completa los campos requeridos para proyectar el flujo de caja de un bono con método alemán. Asegúrate de ingresar datos válidos y actualizados.
         </p>
-        <FormularioBono />
+        <FormularioBono/>
       </div>
     </main>
   )

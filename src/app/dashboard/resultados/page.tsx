@@ -259,14 +259,15 @@ export default function ResultadosPage() {
     console.log(`Precio actual: ${precioActual.toFixed(2)}`)
     console.log(`Utilidad/Pérdida: ${utilidadPerdida.toFixed(2)} (Esperado: 1.13)`)
 
-    // Función TIR mejorada (Newton-Raphson)
-    const calcularTIR = (flujos: number[], nombreFlujo: string) => {
-      console.log(`\n🎯 CALCULANDO TIR - ${nombreFlujo}:`)
-      console.log('Flujos:', flujos)
+    // Función XIRR optimizada (TIR No Periódica) - Alineada con Excel
+    const calcularXIRR = (flujos: number[], fechas: Date[], nombreFlujo: string) => {
+      console.log(`\n🎯 CALCULANDO XIRR OPTIMIZADO - ${nombreFlujo}:`)
+      console.log('Flujos:', flujos.map(f => Number(f.toFixed(8))))
+      console.log('Fechas:', fechas.map(f => f.toLocaleDateString('es-ES')))
       
-      // Validar flujos
-      if (!flujos || flujos.length < 2) {
-        console.log('❌ Error: flujos insuficientes')
+      // Validar flujos y fechas
+      if (!flujos || !fechas || flujos.length !== fechas.length || flujos.length < 2) {
+        console.log('❌ Error: flujos y fechas inconsistentes')
         return 0
       }
       
@@ -279,93 +280,200 @@ export default function ResultadosPage() {
         return 0
       }
 
-      let tasa = 0.05 // Estimación inicial
-      const tolerancia = 1e-8
-      const maxIteraciones = 1000
+      // Redondear flujos a 8 decimales para consistencia con Excel
+      const flujosRedondeados = flujos.map(f => Number(f.toFixed(8)))
       
-      console.log(`Iniciando iteraciones con tasa inicial: ${tasa}`)
+      // Función para calcular años entre fechas (método Excel)
+      const calcularAnios = (fechaInicial: Date, fechaFinal: Date): number => {
+        const msInicial = fechaInicial.getTime()
+        const msFinal = fechaFinal.getTime()
+        const diasDiferencia = (msFinal - msInicial) / (1000 * 60 * 60 * 24)
+        
+        // Excel usa 365 días exactos para XIRR
+        return diasDiferencia / 365
+      }
+
+      // Calcular fracciones de año desde la primera fecha (método Excel)
+      const fechaInicial = fechas[0]
+      const anios = fechas.map(fecha => calcularAnios(fechaInicial, fecha))
       
-      for (let iter = 0; iter < maxIteraciones; iter++) {
+      console.log('Años desde fecha inicial:', anios.map(a => a.toFixed(8)))
+
+      // Función para calcular VAN y su derivada
+      const calcularVANyDerivada = (tasa: number) => {
         let van = 0
         let derivada = 0
         
-        for (let i = 0; i < flujos.length; i++) {
-          const factor = Math.pow(1 + tasa, i)
-          if (factor === 0) {
-            console.log('❌ Error: factor es 0')
-            return 0
-          }
-          van += flujos[i] / factor
-          if (i > 0) {
-            derivada -= (i * flujos[i]) / Math.pow(1 + tasa, i + 1)
+        for (let i = 0; i < flujosRedondeados.length; i++) {
+          const t = anios[i]
+          const flujo = flujosRedondeados[i]
+          
+          if (t === 0) {
+            // Primer flujo (t=0)
+            van += flujo
+            // La derivada para t=0 es 0
+          } else {
+            const factor = Math.pow(1 + tasa, t)
+            van += flujo / factor
+            derivada -= (t * flujo) / (factor * (1 + tasa))
           }
         }
         
-        if (Math.abs(van) < tolerancia) {
-          console.log(`✅ Convergencia alcanzada en iteración ${iter}`)
-          break
+        return { van, derivada }
+      }
+
+      // Función de estimación inicial mejorada
+      const estimacionInicial = () => {
+        // Método similar al de Excel: estimar basado en flujos
+        const flujoInicial = Math.abs(flujosRedondeados[0])
+        const flujoFinal = Math.abs(flujosRedondeados[flujosRedondeados.length - 1])
+        const tiempoTotal = anios[anios.length - 1]
+        
+        if (tiempoTotal > 0) {
+          const estimacion = Math.pow(flujoFinal / flujoInicial, 1 / tiempoTotal) - 1
+          return Math.max(Math.min(estimacion, 1), -0.99) // Limitar entre -99% y 100%
         }
-        if (Math.abs(derivada) < 1e-12) {
-          console.log(`⚠️ Derivada muy pequeña en iteración ${iter}`)
+        
+        return 0.1 // Fallback
+      }
+
+      let tasa = estimacionInicial()
+      console.log(`Estimación inicial: ${(tasa * 100).toFixed(6)}%`)
+      
+      // Parámetros de convergencia ajustados para coincidir con Excel
+      const toleranciaVAN = 1e-12
+      const toleranciaTasa = 1e-12
+      const maxIteraciones = 1000
+      
+      let iteracion = 0
+      let vanAnterior = Number.MAX_VALUE
+      
+      // Algoritmo Newton-Raphson mejorado
+      for (iteracion = 0; iteracion < maxIteraciones; iteracion++) {
+        const { van, derivada } = calcularVANyDerivada(tasa)
+        
+        if (iteracion < 10 || iteracion % 50 === 0) {
+          console.log(`Iter ${iteracion}: tasa=${(tasa * 100).toFixed(8)}%, VAN=${van.toFixed(12)}, der=${derivada.toFixed(12)}`)
+        }
+        
+        // Verificar convergencia por VAN
+        if (Math.abs(van) < toleranciaVAN) {
+          console.log(`✅ Convergencia por VAN en iteración ${iteracion}`)
           break
         }
         
-        const nuevaTasa = tasa - van / derivada
+        // Verificar si el VAN no está mejorando (evitar ciclos infinitos)
+        if (Math.abs(van) >= Math.abs(vanAnterior) && iteracion > 10) {
+          console.log(`⚠️ VAN no mejora, probando bisección...`)
+          break
+        }
+        vanAnterior = van
+        
+        // Verificar derivada válida
+        if (Math.abs(derivada) < 1e-15) {
+          console.log(`⚠️ Derivada muy pequeña en iteración ${iteracion}`)
+          break
+        }
+        
+        // Calcular nueva tasa
+        const deltaTasa = van / derivada
+        let nuevaTasa = tasa - deltaTasa
+        
+        // Limitar cambios drásticos (estrategia de amortiguación)
+        const maxCambio = 0.5
+        if (Math.abs(deltaTasa) > maxCambio) {
+          nuevaTasa = tasa - Math.sign(deltaTasa) * maxCambio
+        }
         
         // Limitar tasa a rango razonable
-        if (nuevaTasa < -0.99) {
-          tasa = -0.99
-        } else if (nuevaTasa > 5) {
-          tasa = 5
-        } else {
+        nuevaTasa = Math.max(Math.min(nuevaTasa, 10), -0.999)
+        
+        // Verificar convergencia por cambio de tasa
+        if (Math.abs(nuevaTasa - tasa) < toleranciaTasa) {
+          console.log(`✅ Convergencia por cambio de tasa en iteración ${iteracion}`)
           tasa = nuevaTasa
-        }
-        
-        if (iter % 100 === 0 && iter > 0) {
-          console.log(`Iteración ${iter}: tasa = ${tasa.toFixed(8)}, VAN = ${van.toFixed(8)}`)
-        }
-        
-        if (Math.abs(tasa - nuevaTasa) < tolerancia) {
-          console.log(`✅ Convergencia por cambio mínimo en iteración ${iter}`)
           break
+        }
+        
+        tasa = nuevaTasa
+      }
+      
+      // Si Newton-Raphson no converge, usar bisección como respaldo
+      if (iteracion >= maxIteraciones || Math.abs(calcularVANyDerivada(tasa).van) > toleranciaVAN) {
+        console.log(`🔄 Aplicando método de bisección como respaldo...`)
+        
+        let tasaMin = -0.999
+        let tasaMax = 10
+        let tasaBiseccion = (tasaMin + tasaMax) / 2
+        
+        for (let i = 0; i < 100; i++) {
+          const { van } = calcularVANyDerivada(tasaBiseccion)
+          
+          if (Math.abs(van) < toleranciaVAN) {
+            console.log(`✅ Bisección converge en iteración ${i}`)
+            tasa = tasaBiseccion
+            break
+          }
+          
+          const { van: vanMin } = calcularVANyDerivada(tasaMin)
+          
+          if ((van > 0 && vanMin > 0) || (van < 0 && vanMin < 0)) {
+            tasaMin = tasaBiseccion
+          } else {
+            tasaMax = tasaBiseccion
+          }
+          
+          tasaBiseccion = (tasaMin + tasaMax) / 2
+          
+          if (i % 20 === 0) {
+            console.log(`Bisección ${i}: tasa=${(tasaBiseccion * 100).toFixed(8)}%, VAN=${van.toFixed(12)}`)
+          }
         }
       }
       
-      console.log(`🎯 TIR final para ${nombreFlujo}: ${tasa.toFixed(8)} (${(tasa * 100).toFixed(5)}%)`)
+      // Verificación final
+      const { van: vanFinal } = calcularVANyDerivada(tasa)
+      console.log(`🎯 XIRR final para ${nombreFlujo}: ${(tasa * 100).toFixed(8)}%`)
+      console.log(`   VAN final: ${vanFinal.toFixed(12)}`)
+      console.log(`   Iteraciones: ${iteracion}`)
+      
       return isNaN(tasa) ? 0 : tasa
     }
 
-    // Calcular TCEAs según testing.txt
-    console.log('\n🏦 CALCULANDO TIR PARA CADA FLUJO:')
-    const tirEmisorSemestral = calcularTIR(flujosEmisor, 'EMISOR')
-    const tirEmisorEscudoSemestral = calcularTIR(flujosEmisorEscudo, 'EMISOR C/ESCUDO')
-    const tirBonistaSemestral = calcularTIR(flujosBonista, 'BONISTA')
-
-    console.log('\n📈 RESUMEN DE TIR SEMESTRALES:')
-    console.log(`TIR Emisor Semestral: ${tirEmisorSemestral.toFixed(8)} (${(tirEmisorSemestral * 100).toFixed(5)}%)`)
-    console.log(`TIR Emisor c/Escudo Semestral: ${tirEmisorEscudoSemestral.toFixed(8)} (${(tirEmisorEscudoSemestral * 100).toFixed(5)}%)`)
-    console.log(`TIR Bonista Semestral: ${tirBonistaSemestral.toFixed(8)} (${(tirBonistaSemestral * 100).toFixed(5)}%)`)
-
-    // Convertir a anuales (semestral -> anual) con validación
-    console.log('\n🔄 CONVERSIÓN A TASAS ANUALES:')
+    // Calcular TCEAs usando XIRR (TIR No Periódica) según testing.txt
+    console.log('\n🏦 CALCULANDO XIRR PARA CADA FLUJO:')
     
-    const tceaEmisor = !isNaN(tirEmisorSemestral) ? (Math.pow(1 + tirEmisorSemestral, 2) - 1) * 100 : 0
-    console.log(`TCEA Emisor: (1 + ${tirEmisorSemestral.toFixed(8)})^2 - 1 = ${tceaEmisor.toFixed(5)}% (Esperado: 6.66299%)`)
-    
-    const tceaEmisorEscudo = !isNaN(tirEmisorEscudoSemestral) ? (Math.pow(1 + tirEmisorEscudoSemestral, 2) - 1) * 100 : 0
-    console.log(`TCEA c/Escudo: (1 + ${tirEmisorEscudoSemestral.toFixed(8)})^2 - 1 = ${tceaEmisorEscudo.toFixed(5)}% (Esperado: 4.26000%)`)
-    
-    const treaBonista = !isNaN(tirBonistaSemestral) ? (Math.pow(1 + tirBonistaSemestral, 2) - 1) * 100 : 0
-    console.log(`TREA Bonista: (1 + ${tirBonistaSemestral.toFixed(8)})^2 - 1 = ${treaBonista.toFixed(5)}% (Esperado: 4.63123%)`)
-
-    console.log('\n📊 INDICADORES FINALES:')
-    console.log({
-      precioActual: precioActual.toFixed(2),
-      utilidadPerdida: utilidadPerdida.toFixed(2),
-      tceaEmisor: tceaEmisor.toFixed(5) + '%',
-      tceaEmisorEscudo: tceaEmisorEscudo.toFixed(5) + '%',
-      treaBonista: treaBonista.toFixed(5) + '%'
+    // Extraer fechas de la tabla
+    const fechas = tabla.map((row: any) => {
+      // Parsear la fecha desde el formato de la tabla
+      const fechaStr = row.fecha // formato: "dd/mm/yyyy"
+      const [dia, mes, ano] = fechaStr.split('/').map(Number)
+      return new Date(ano, mes - 1, dia) // mes - 1 porque Date usa 0-indexing
     })
+    
+    console.log('Fechas extraídas:', fechas.map(f => f.toLocaleDateString('es-ES')))
+    
+    // Calcular XIRR (ya devuelve tasa anual directamente)
+    const tceaEmisorDecimal = calcularXIRR(flujosEmisor, fechas, 'EMISOR')
+    const tceaEmisorEscudoDecimal = calcularXIRR(flujosEmisorEscudo, fechas, 'EMISOR C/ESCUDO')
+    const treaBonistaDecimal = calcularXIRR(flujosBonista, fechas, 'BONISTA')
+
+    console.log('\n📈 RESUMEN DE XIRR (TASAS ANUALES):')
+    console.log(`TCEA Emisor: ${(tceaEmisorDecimal * 100).toFixed(8)}%`)
+    console.log(`TCEA Emisor c/Escudo: ${(tceaEmisorEscudoDecimal * 100).toFixed(8)}%`)
+    console.log(`TREA Bonista: ${(treaBonistaDecimal * 100).toFixed(8)}%`)
+
+    // Convertir a porcentajes finales (ya son tasas anuales)
+    console.log('\n✅ TASAS FINALES (YA ANUALIZADAS):')
+    
+    const tceaEmisor = tceaEmisorDecimal * 100
+    console.log(`TCEA Emisor: ${tceaEmisor.toFixed(5)}% (Esperado: 6.66299%)`)
+    
+    const tceaEmisorEscudo = tceaEmisorEscudoDecimal * 100
+    console.log(`TCEA c/Escudo: ${tceaEmisorEscudo.toFixed(5)}% (Esperado: 4.26000%)`)
+    
+    const treaBonista = treaBonistaDecimal * 100
+    console.log(`TREA Bonista: ${treaBonista.toFixed(5)}% (Esperado: 4.63123%)`)
 
     setIndicadores({
       precioActual: isNaN(precioActual) ? 0 : precioActual,
@@ -452,7 +560,7 @@ export default function ResultadosPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Resultados del Bono</h1>
             <p className="text-gray-600 mt-1">
-              Tabla de flujo de caja y indicadores financieros según testing.txt
+              Tabla de flujo de caja y indicadores financieros
             </p>
           </div>
           <div className="flex gap-3">
@@ -478,28 +586,28 @@ export default function ResultadosPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Parámetros del Bono</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="font-medium text-gray-700">Valor Nominal:</span>
-              <span className="ml-2">{parseFloat(datos.valor_nominal).toLocaleString()}</span>
+              <span className="font-medium text-black">Valor Nominal:</span>
+              <span className="ml-2 text-black">{parseFloat(datos.valor_nominal).toLocaleString()}</span>
             </div>
             <div>
-              <span className="font-medium text-gray-700">Valor Comercial:</span>
-              <span className="ml-2">{parseFloat(datos.valor_comercial).toLocaleString()}</span>
+              <span className="font-medium text-black">Valor Comercial:</span>
+              <span className="ml-2 text-black">{parseFloat(datos.valor_comercial).toLocaleString()}</span>
             </div>
             <div>
-              <span className="font-medium text-gray-700">Períodos:</span>
-              <span className="ml-2">{datos.numero_periodos}</span>
+              <span className="font-medium text-black">Períodos:</span>
+              <span className="ml-2 text-black">{datos.numero_periodos}</span>
             </div>
             <div>
-              <span className="font-medium text-gray-700">Tasa Efectiva:</span>
-              <span className="ml-2">{(datos.tasa_efectiva_periodo * 100).toFixed(5)}%</span>
+              <span className="font-medium text-black">Tasa Efectiva:</span>
+              <span className="ml-2 text-black">{(datos.tasa_efectiva_periodo * 100).toFixed(5)}%</span>
             </div>
             <div>
-              <span className="font-medium text-gray-700">Costos Emisor:</span>
-              <span className="ml-2">{datos.costos_emisor.toFixed(2)}</span>
+              <span className="font-medium text-black">Costos Emisor:</span>
+              <span className="ml-2 text-black">{datos.costos_emisor.toFixed(2)}</span>
             </div>
             <div>
-              <span className="font-medium text-gray-700">Costos Bonista:</span>
-              <span className="ml-2">{datos.costos_bonista.toFixed(2)}</span>
+              <span className="font-medium text-black">Costos Bonista:</span>
+              <span className="ml-2 text-black">{datos.costos_bonista.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -539,7 +647,7 @@ export default function ResultadosPage() {
         {/* Tabla de Flujo de Caja */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Tabla de Flujo de Caja - Según Testing.txt</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Tabla de Flujo de Caja</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full">

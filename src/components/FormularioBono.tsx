@@ -3,6 +3,14 @@
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+
+interface CostoComision {
+    id: string
+    nombre: string
+    porcentaje: string
+    aplicaA: 'emisor' | 'bonista' | 'ambos' | 'ninguno'
+}
 
 interface FormData {
     // Datos básicos del bono
@@ -16,13 +24,6 @@ interface FormData {
     tasa_descuento_anual: string
     impuesto_renta: string
     fecha_emision: string
-    
-    // Costos (porcentajes)
-    prima: string
-    estructuracion: string
-    colocacion: string
-    flotacion: string
-    cavali: string
 }
 
 interface DatosCompletos extends FormData {
@@ -31,12 +32,20 @@ interface DatosCompletos extends FormData {
     costos_emisor: number
     costos_bonista: number
     numero_periodos: number
+    costos_comisiones: CostoComision[]
     timestamp: number
 }
 
 export default function FormularioBono() {
     const router = useRouter()
     const [isCalculating, setIsCalculating] = useState<boolean>(false)
+    const [costosComisiones, setCostosComisiones] = useState<CostoComision[]>([
+        { id: '1', nombre: 'Prima', porcentaje: '1', aplicaA: 'ninguno' },
+        { id: '2', nombre: 'Estructuración', porcentaje: '1', aplicaA: 'emisor' },
+        { id: '3', nombre: 'Colocación', porcentaje: '0.25', aplicaA: 'emisor' },
+        { id: '4', nombre: 'Flotación', porcentaje: '0.45', aplicaA: 'ambos' },
+        { id: '5', nombre: 'CAVALI', porcentaje: '0.5', aplicaA: 'ambos' },
+    ])
 
     const {
         register,
@@ -56,17 +65,31 @@ export default function FormularioBono() {
             tasa_descuento_anual: '4.5',
             impuesto_renta: '30',
             fecha_emision: '2025-06-01',
-            
-            // Costos (porcentajes)
-            prima: '1',
-            estructuracion: '1',
-            colocacion: '0.25',
-            flotacion: '0.45',
-            cavali: '0.5',
         }
     })
 
     const valores = watch()
+
+    // Funciones para manejar costos y comisiones
+    const agregarCosto = () => {
+        const nuevoCosto: CostoComision = {
+            id: Date.now().toString(),
+            nombre: '',
+            porcentaje: '0',
+            aplicaA: 'emisor'
+        }
+        setCostosComisiones([...costosComisiones, nuevoCosto])
+    }
+
+    const eliminarCosto = (id: string) => {
+        setCostosComisiones(costosComisiones.filter(costo => costo.id !== id))
+    }
+
+    const actualizarCosto = (id: string, campo: keyof CostoComision, valor: string) => {
+        setCostosComisiones(costosComisiones.map(costo => 
+            costo.id === id ? { ...costo, [campo]: valor } : costo
+        ))
+    }
 
     // Cálculos automáticos
     const calcularTasaEfectivaPeriodo = (): number => {
@@ -85,20 +108,22 @@ export default function FormularioBono() {
 
     const calcularCostosEmisir = (): number => {
         const valorComercial = parseFloat(valores.valor_comercial || '0')
-        const estructuracion = parseFloat(valores.estructuracion || '0') / 100
-        const colocacion = parseFloat(valores.colocacion || '0') / 100
-        const flotacion = parseFloat(valores.flotacion || '0') / 100
-        const cavali = parseFloat(valores.cavali || '0') / 100
-        
-        return valorComercial * (estructuracion + colocacion + flotacion + cavali)
+        return costosComisiones
+            .filter(costo => costo.aplicaA === 'emisor' || costo.aplicaA === 'ambos')
+            .reduce((total, costo) => {
+                const porcentaje = parseFloat(costo.porcentaje || '0') / 100
+                return total + (valorComercial * porcentaje)
+            }, 0)
     }
 
     const calcularCostosBonista = (): number => {
         const valorComercial = parseFloat(valores.valor_comercial || '0')
-        const flotacion = parseFloat(valores.flotacion || '0') / 100
-        const cavali = parseFloat(valores.cavali || '0') / 100
-        
-        return valorComercial * (flotacion + cavali)
+        return costosComisiones
+            .filter(costo => costo.aplicaA === 'bonista' || costo.aplicaA === 'ambos')
+            .reduce((total, costo) => {
+                const porcentaje = parseFloat(costo.porcentaje || '0') / 100
+                return total + (valorComercial * porcentaje)
+            }, 0)
     }
 
     const calcularNumeroPeriodos = (): number => {
@@ -121,6 +146,7 @@ export default function FormularioBono() {
                 costos_emisor: calcularCostosEmisir(),
                 costos_bonista: calcularCostosBonista(),
                 numero_periodos: calcularNumeroPeriodos(),
+                costos_comisiones: costosComisiones,
                 // Timestamp para identificar el cálculo
                 timestamp: Date.now()
             }
@@ -136,6 +162,16 @@ export default function FormularioBono() {
             alert('Error al procesar los datos. Por favor, revisa los valores ingresados.')
         } finally {
             setIsCalculating(false)
+        }
+    }
+
+    const getColorBadge = (aplicaA: string) => {
+        switch (aplicaA) {
+            case 'emisor': return 'bg-red-100 text-red-800'
+            case 'bonista': return 'bg-green-100 text-green-800'
+            case 'ambos': return 'bg-purple-100 text-purple-800'
+            case 'ninguno': return 'bg-blue-100 text-blue-800'
+            default: return 'bg-gray-100 text-gray-800'
         }
     }
 
@@ -159,7 +195,7 @@ export default function FormularioBono() {
                                     required: 'El valor nominal es requerido',
                                     min: { value: 0.01, message: 'Debe ser mayor a 0' }
                                 })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                                 placeholder="1000"
                             />
                             {errors.valor_nominal && (
@@ -178,7 +214,7 @@ export default function FormularioBono() {
                                     required: 'El valor comercial es requerido',
                                     min: { value: 0.01, message: 'Debe ser mayor a 0' }
                                 })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                                 placeholder="1050"
                             />
                             {errors.valor_comercial && (
@@ -197,7 +233,7 @@ export default function FormularioBono() {
                                     required: 'El número de años es requerido',
                                     min: { value: 0.5, message: 'Debe ser mayor a 0' }
                                 })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                                 placeholder="2"
                             />
                             {errors.nro_anos && (
@@ -211,7 +247,7 @@ export default function FormularioBono() {
                             </label>
                             <select
                                 {...register('dias_periodo', { required: 'Selecciona el período' })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                             >
                                 <option value="30">Mensual (30 días)</option>
                                 <option value="90">Trimestral (90 días)</option>
@@ -229,7 +265,7 @@ export default function FormularioBono() {
                             </label>
                             <select
                                 {...register('contador_dias', { required: 'Selecciona el contador' })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                             >
                                 <option value="ordinario">Ordinario</option>
                                 <option value="exacto">Exacto</option>
@@ -245,7 +281,7 @@ export default function FormularioBono() {
                             </label>
                             <select
                                 {...register('dias_ano', { required: 'Selecciona los días por año' })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                             >
                                 <option value="360">360 días</option>
                                 <option value="365">365 días</option>
@@ -262,7 +298,7 @@ export default function FormularioBono() {
                             <input
                                 type="date"
                                 {...register('fecha_emision', { required: 'La fecha de emisión es requerida' })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                             />
                             {errors.fecha_emision && (
                                 <p className="text-red-500 text-xs mt-1">{errors.fecha_emision.message}</p>
@@ -288,7 +324,7 @@ export default function FormularioBono() {
                                     required: 'La tasa efectiva anual es requerida',
                                     min: { value: 0, message: 'Debe ser mayor o igual a 0' }
                                 })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                                 placeholder="8"
                             />
                             {errors.tasa_efectiva_anual && (
@@ -307,7 +343,7 @@ export default function FormularioBono() {
                                     required: 'La tasa de descuento anual es requerida',
                                     min: { value: 0, message: 'Debe ser mayor o igual a 0' }
                                 })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                                 placeholder="4.5"
                             />
                             {errors.tasa_descuento_anual && (
@@ -327,7 +363,7 @@ export default function FormularioBono() {
                                     min: { value: 0, message: 'Debe ser mayor o igual a 0' },
                                     max: { value: 100, message: 'Debe ser menor o igual a 100' }
                                 })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
                                 placeholder="30"
                             />
                             {errors.impuesto_renta && (
@@ -340,99 +376,88 @@ export default function FormularioBono() {
 
                 {/* Costos y Comisiones */}
                 <div className="border-b pb-6">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4">Costos y Comisiones (%)</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-semibold text-gray-900">Costos y Comisiones (%)</h2>
+                        <button
+                            type="button"
+                            onClick={agregarCosto}
+                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                            <PlusIcon className="h-4 w-4 mr-1" />
+                            Agregar Costo
+                        </button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        {costosComisiones.map((costo) => (
+                            <div key={costo.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Nombre del Costo
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={costo.nombre}
+                                        onChange={(e) => actualizarCosto(costo.id, 'nombre', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white font-medium text-gray-900"
+                                        placeholder="Ej: Prima, Estructuración"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Porcentaje (%)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.001"
+                                        value={costo.porcentaje}
+                                        onChange={(e) => actualizarCosto(costo.id, 'porcentaje', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white font-medium text-gray-900"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Aplica a
+                                    </label>
+                                    <select
+                                        value={costo.aplicaA}
+                                        onChange={(e) => actualizarCosto(costo.id, 'aplicaA', e.target.value as CostoComision['aplicaA'])}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white font-medium text-gray-900"
+                                    >
+                                        <option value="emisor">Emisor</option>
+                                        <option value="bonista">Bonista</option>
+                                        <option value="ambos">Ambos</option>
+                                        <option value="ninguno">Ninguno</option>
+                                    </select>
+                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${getColorBadge(costo.aplicaA)}`}>
+                                        {costo.aplicaA === 'emisor' && 'Emisor'}
+                                        {costo.aplicaA === 'bonista' && 'Bonista'}
+                                        {costo.aplicaA === 'ambos' && 'Ambos'}
+                                        {costo.aplicaA === 'ninguno' && 'Ninguno'}
+                                    </span>
+                                </div>
+
+                                <div className="flex items-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => eliminarCosto(costo.id)}
+                                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                    >
+                                        <TrashIcon className="h-4 w-4 mr-1" />
+                                        Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
                         
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Prima (%) <span className="text-blue-500">(Ni emisor ni bonista)</span>
-                            </label>
-                            <input
-                                type="number"
-                                step="0.001"
-                                {...register('prima', { 
-                                    min: { value: 0, message: 'Debe ser mayor o igual a 0' }
-                                })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="1"
-                            />
-                            {errors.prima && (
-                                <p className="text-red-500 text-xs mt-1">{errors.prima.message}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Estructuración (%) <span className="text-red-500">(Emisor)</span>
-                            </label>
-                            <input
-                                type="number"
-                                step="0.001"
-                                {...register('estructuracion', { 
-                                    min: { value: 0, message: 'Debe ser mayor o igual a 0' }
-                                })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="1"
-                            />
-                            {errors.estructuracion && (
-                                <p className="text-red-500 text-xs mt-1">{errors.estructuracion.message}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Colocación (%) <span className="text-red-500">(Emisor)</span>
-                            </label>
-                            <input
-                                type="number"
-                                step="0.001"
-                                {...register('colocacion', { 
-                                    min: { value: 0, message: 'Debe ser mayor o igual a 0' }
-                                })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="0.25"
-                            />
-                            {errors.colocacion && (
-                                <p className="text-red-500 text-xs mt-1">{errors.colocacion.message}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Flotación (%) <span className="text-purple-500">(Ambos)</span>
-                            </label>
-                            <input
-                                type="number"
-                                step="0.001"
-                                {...register('flotacion', { 
-                                    min: { value: 0, message: 'Debe ser mayor o igual a 0' }
-                                })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="0.45"
-                            />
-                            {errors.flotacion && (
-                                <p className="text-red-500 text-xs mt-1">{errors.flotacion.message}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                CAVALI (%) <span className="text-purple-500">(Ambos)</span>
-                            </label>
-                            <input
-                                type="number"
-                                step="0.001"
-                                {...register('cavali', { 
-                                    min: { value: 0, message: 'Debe ser mayor o igual a 0' }
-                                })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="0.5"
-                            />
-                            {errors.cavali && (
-                                <p className="text-red-500 text-xs mt-1">{errors.cavali.message}</p>
-                            )}
-                        </div>
-
+                        {costosComisiones.length === 0 && (
+                            <div className="text-center py-8 text-gray-500">
+                                <p>No hay costos agregados. Haz clic en "Agregar Costo" para comenzar.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -449,7 +474,7 @@ export default function FormularioBono() {
                                 type="text"
                                 value={(calcularTasaEfectivaPeriodo() * 100).toFixed(5)}
                                 readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 font-medium"
                             />
                         </div>
 
@@ -461,7 +486,7 @@ export default function FormularioBono() {
                                 type="text"
                                 value={(calcularTasaDescuentoPeriodo() * 100).toFixed(5)}
                                 readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 font-medium"
                             />
                         </div>
 
@@ -473,7 +498,7 @@ export default function FormularioBono() {
                                 type="text"
                                 value={calcularNumeroPeriodos()}
                                 readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 font-medium"
                             />
                         </div>
 
@@ -485,7 +510,7 @@ export default function FormularioBono() {
                                 type="text"
                                 value={calcularCostosEmisir().toFixed(2)}
                                 readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 font-medium"
                             />
                         </div>
 
@@ -497,7 +522,7 @@ export default function FormularioBono() {
                                 type="text"
                                 value={calcularCostosBonista().toFixed(2)}
                                 readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 font-medium"
                             />
                         </div>
 

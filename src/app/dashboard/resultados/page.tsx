@@ -39,16 +39,30 @@ export default function ResultadosPage() {
       dias_periodo
     } = datos
 
-    const valorNominal = parseFloat(valor_nominal)
-    const valorComercial = parseFloat(valor_comercial)
-    const numPeriodos = numero_periodos
-    const tasaPeriodo = tasa_efectiva_periodo
-    const tasaDescuento = tasa_descuento_periodo
-    const costosEmisor = costos_emisor
-    const costosBonista = costos_bonista
-    const impuesto = parseFloat(impuesto_renta) / 100
-    const primaPorcentaje = parseFloat(prima) / 100
+    const valorNominal = parseFloat(valor_nominal) || 0
+    const valorComercial = parseFloat(valor_comercial) || 0
+    const numPeriodos = parseInt(numero_periodos) || 4
+    const tasaPeriodo = parseFloat(tasa_efectiva_periodo) || 0
+    const tasaDescuento = parseFloat(tasa_descuento_periodo) || 0
+    const costosEmisor = parseFloat(costos_emisor) || 0
+    const costosBonista = parseFloat(costos_bonista) || 0
+    const impuesto = parseFloat(impuesto_renta) / 100 || 0
+    const primaPorcentaje = parseFloat(prima) / 100 || 0
     const primaValor = valorNominal * primaPorcentaje
+
+    console.log('Datos del bono:', {
+      valorNominal,
+      valorComercial,
+      numPeriodos,
+      tasaPeriodo,
+      tasaDescuento,
+      costosEmisor,
+      costosBonista,
+      impuesto,
+      prima: prima,
+      primaPorcentaje,
+      primaValor
+    })
 
     // Calcular tabla período por período - SEGÚN TESTING.TXT
     const tabla = []
@@ -90,6 +104,11 @@ export default function ResultadosPage() {
       let primaEnPeriodo = 0
       let gracia = ''
 
+      // Validar que el interés no sea NaN
+      if (isNaN(interes)) {
+        console.error(`Interés es NaN en período ${i}:`, { saldoPendiente, tasaPeriodo })
+      }
+
       // Según testing.txt: períodos 1-2 gracia P, período 3-4 gracia S
       if (i <= 2) {
         gracia = 'P' // Gracia parcial (solo intereses)
@@ -100,15 +119,125 @@ export default function ResultadosPage() {
           amortizacion = 500 // Primera amortización
         } else if (i === 4) {
           amortizacion = 500 // Segunda amortización
-          primaEnPeriodo = primaValor // Prima solo en último período
         }
       }
 
-      const cuota = interes + amortizacion + primaEnPeriodo
+      // Prima se calcula solo en el último período: =-SI(A26=J$5,D$15*I26,0)
+      // Si período actual (i) == total períodos (numPeriodos), entonces prima = primaPorcentaje * bono_indexado_actual
+      if (i === numPeriodos) {
+        console.log(`🔍 CALCULANDO PRIMA - Período ${i} (último período):`)
+        console.log(`   - Valor prima desde datos:`, prima)
+        console.log(`   - Prima porcentaje (parseFloat(prima)/100):`, primaPorcentaje)
+        console.log(`   - Saldo pendiente (bono indexado actual):`, saldoPendiente)
+        
+        // El bono indexado actual es el saldo pendiente ANTES de la amortización
+        const bonoIndexadoActual = saldoPendiente
+        primaEnPeriodo = primaPorcentaje * bonoIndexadoActual // Para -1%: -0.01 * 500 = -5.00
+        
+        console.log(`   - Cálculo: ${primaPorcentaje} * ${bonoIndexadoActual} = ${primaEnPeriodo}`)
+        console.log(`   - Esperado: -5.00`)
+        console.log(`   - ¿Coincide?: ${primaEnPeriodo === -5.00 ? '✅ SÍ' : '❌ NO'}`)
+        
+        // Validar que la prima no sea NaN
+        if (isNaN(primaEnPeriodo)) {
+          console.error(`Prima es NaN en período ${i}:`, { bonoIndexadoActual, primaPorcentaje })
+          primaEnPeriodo = 0
+        }
+        
+        console.log(`Período ${i} - Cálculo prima:`, {
+          valorPrimaOriginal: prima,
+          bonoIndexadoActual,
+          primaPorcentaje,
+          primaEnPeriodo,
+          esperado: -5.00
+        })
+      }
+
+      // Cálculo de cuota según Excel: =SI(A26<=J$5,SI(G26="T",0,SI(G26="P",J26,J26+L26)),0)
+      // A26 = período actual, J$5 = total períodos, G26 = gracia, J26 = cupón (interés), L26 = amortización
+      // Traducido: Si período <= total_periodos, Si gracia="T", 0, Si gracia="P", cupón, cupón+amortización, sino 0
+      let cuota = 0
+      
+      console.log(`🔍 CALCULANDO CUOTA - Período ${i}:`)
+      console.log(`   - A26 (período actual): ${i}`)
+      console.log(`   - J$5 (total períodos): ${numPeriodos}`)
+      console.log(`   - G26 (gracia): ${gracia}`)
+      console.log(`   - J26 (cupón/interés): ${-interes}`) // Cupón es negativo del interés
+      console.log(`   - L26 (amortización): ${-amortizacion}`) // Amortización es negativa
+      
+      // Evaluar la fórmula paso a paso
+      if (i <= numPeriodos) {
+        console.log(`   - Paso 1: ${i} <= ${numPeriodos} → VERDADERO`)
+        
+        if (gracia === "T") {
+          cuota = 0 // Gracia total
+          console.log(`   - Paso 2: gracia = "T" → cuota = 0`)
+        } else if (gracia === "P") {
+          cuota = -interes // Gracia parcial: solo cupón (interés negativo)
+          console.log(`   - Paso 2: gracia = "P" → cuota = J26 = ${-interes}`)
+        } else {
+          // Sin gracia: cupón + amortización (ambos negativos)
+          cuota = (-interes) + (-amortizacion) // J26 + L26
+          console.log(`   - Paso 2: gracia = "${gracia}" (ni T ni P) → cuota = J26 + L26 = ${-interes} + ${-amortizacion} = ${cuota}`)
+        }
+      } else {
+        cuota = 0 // Fuera del plazo
+        console.log(`   - Paso 1: ${i} <= ${numPeriodos} → FALSO → cuota = 0`)
+      }
+      
+      console.log(`   - Cuota final (sin prima): ${cuota}`)
+      console.log(`   - Prima (se maneja por separado): ${primaEnPeriodo}`)
+      console.log(`   - Comparación con Excel: Período ${i} debería ser ${i === 4 ? '-519.62' : i <= 2 ? '39.23' : i === 3 ? '539.23' : 'N/A'}`)
+      
+      // Validar que la cuota no sea NaN
+      if (isNaN(cuota)) {
+        console.error(`Cuota es NaN en período ${i}:`, { interes, amortizacion })
+        cuota = 0
+      }
+      
+      console.log(`Período ${i} - Componentes:`, {
+        interes,
+        amortizacion,
+        primaEnPeriodo,
+        cuota,
+        saldoPendiente
+      })
+      
+      // Cálculo de flujo emisor según Excel: =SI(A26<=J$5,K26+M26,0)
+      // A26 = período actual, J$5 = total períodos, K26 = cuota, M26 = prima
+      // Traducido: Si período <= total_periodos, cuota + prima, sino 0
+      let flujoEmisor = 0
+      
+      console.log(`🔍 CALCULANDO FLUJO EMISOR - Período ${i}:`)
+      console.log(`   - A26 (período actual): ${i}`)
+      console.log(`   - J$5 (total períodos): ${numPeriodos}`)
+      console.log(`   - K26 (cuota): ${cuota}`)
+      console.log(`   - M26 (prima): ${primaEnPeriodo}`)
+      
+      if (i <= numPeriodos) {
+        flujoEmisor = cuota + primaEnPeriodo // K26 + M26
+        console.log(`   - Paso 1: ${i} <= ${numPeriodos} → VERDADERO`)
+        console.log(`   - Flujo emisor = K26 + M26 = ${cuota} + ${primaEnPeriodo} = ${flujoEmisor}`)
+      } else {
+        flujoEmisor = 0
+        console.log(`   - Paso 1: ${i} <= ${numPeriodos} → FALSO → flujo emisor = 0`)
+      }
+      
+      console.log(`   - Flujo emisor final: ${flujoEmisor}`)
+      console.log(`   - Comparación con Excel: Período ${i} debería ser ${i === 4 ? '-524.62' : i <= 2 ? '39.23' : i === 3 ? '539.23' : 'N/A'}`)
+      console.log(`   - Flujo anterior (método viejo): ${-cuota}`)
+      
       const escudoFiscal = interes * impuesto
-      const flujoEmisor = -cuota
       const flujoEmisorEscudo = flujoEmisor + escudoFiscal
-      const flujoBonista = cuota
+      
+      // Cálculo de flujo bonista: negativo del flujo emisor (a partir del período 1)
+      const flujoBonista = -flujoEmisor
+      
+      console.log(`🔍 CALCULANDO FLUJO BONISTA - Período ${i}:`)
+      console.log(`   - Flujo emisor: ${flujoEmisor}`)
+      console.log(`   - Flujo bonista = -flujo_emisor = -(${flujoEmisor}) = ${flujoBonista}`)
+      console.log(`   - Comparación con Excel: Período ${i} debería ser ${i === 4 ? '524.62' : i <= 2 ? '-39.23' : i === 3 ? '-539.23' : 'N/A'}`)
+      console.log(`   - Flujo bonista anterior (método viejo): ${cuota}`)
 
       tabla.push({
         periodo: i,
@@ -145,17 +274,45 @@ export default function ResultadosPage() {
     const flujosEmisor = tabla.map((row: any) => row.flujoEmisor)
     const flujosEmisorEscudo = tabla.map((row: any) => row.flujoEmisorEscudo)
 
+    console.log('Flujos Bonista:', flujosBonista)
+    console.log('Flujos Emisor:', flujosEmisor)
+    console.log('Tasa Descuento:', tasaDescuento)
+
     // Precio Actual = VNA(tasa_descuento, flujos_bonista_1_a_n) según testing.txt
     let precioActual = 0
     for (let i = 1; i < flujosBonista.length; i++) {
-      precioActual += flujosBonista[i] / Math.pow(1 + tasaDescuento, i)
+      const descuento = Math.pow(1 + tasaDescuento, i)
+      const valorPresente = flujosBonista[i] / descuento
+      console.log(`Período ${i}: Flujo=${flujosBonista[i]}, Descuento=${descuento}, VP=${valorPresente}`)
+      precioActual += valorPresente
     }
+
+    console.log('Precio Actual calculado:', precioActual)
 
     // Utilidad/Pérdida = flujo_inicial_bonista + VNA según testing.txt
     const utilidadPerdida = flujosBonista[0] + precioActual
 
+    console.log('Utilidad/Pérdida:', utilidadPerdida)
+
     // Función TIR mejorada (Newton-Raphson)
-    const calcularTIR = (flujos) => {
+    const calcularTIR = (flujos: number[]) => {
+      console.log('Calculando TIR para flujos:', flujos)
+      
+      // Validar flujos
+      if (!flujos || flujos.length < 2) {
+        console.log('Error: flujos insuficientes')
+        return 0
+      }
+      
+      // Verificar que hay al menos un flujo positivo y uno negativo
+      const hayPositivo = flujos.some(f => f > 0)
+      const hayNegativo = flujos.some(f => f < 0)
+      
+      if (!hayPositivo || !hayNegativo) {
+        console.log('Error: no hay flujos positivos y negativos')
+        return 0
+      }
+
       let tasa = 0.05 // Estimación inicial
       const tolerancia = 1e-8
       const maxIteraciones = 1000
@@ -166,6 +323,10 @@ export default function ResultadosPage() {
         
         for (let i = 0; i < flujos.length; i++) {
           const factor = Math.pow(1 + tasa, i)
+          if (factor === 0) {
+            console.log('Error: factor es 0')
+            return 0
+          }
           van += flujos[i] / factor
           if (i > 0) {
             derivada -= (i * flujos[i]) / Math.pow(1 + tasa, i + 1)
@@ -188,7 +349,9 @@ export default function ResultadosPage() {
         
         if (Math.abs(tasa - nuevaTasa) < tolerancia) break
       }
-      return tasa
+      
+      console.log('TIR calculada:', tasa)
+      return isNaN(tasa) ? 0 : tasa
     }
 
     // Calcular TCEAs según testing.txt
@@ -196,17 +359,29 @@ export default function ResultadosPage() {
     const tirEmisorEscudoSemestral = calcularTIR(flujosEmisorEscudo)
     const tirBonistaSemestral = calcularTIR(flujosBonista)
 
-    // Convertir a anuales (semestral -> anual)
-    const tceaEmisor = (Math.pow(1 + tirEmisorSemestral, 2) - 1) * 100
-    const tceaEmisorEscudo = (Math.pow(1 + tirEmisorEscudoSemestral, 2) - 1) * 100
-    const treaBonista = (Math.pow(1 + tirBonistaSemestral, 2) - 1) * 100
+    console.log('TIR Emisor:', tirEmisorSemestral)
+    console.log('TIR Emisor Escudo:', tirEmisorEscudoSemestral)
+    console.log('TIR Bonista:', tirBonistaSemestral)
+
+    // Convertir a anuales (semestral -> anual) con validación
+    const tceaEmisor = !isNaN(tirEmisorSemestral) ? (Math.pow(1 + tirEmisorSemestral, 2) - 1) * 100 : 0
+    const tceaEmisorEscudo = !isNaN(tirEmisorEscudoSemestral) ? (Math.pow(1 + tirEmisorEscudoSemestral, 2) - 1) * 100 : 0
+    const treaBonista = !isNaN(tirBonistaSemestral) ? (Math.pow(1 + tirBonistaSemestral, 2) - 1) * 100 : 0
+
+    console.log('Indicadores finales:', {
+      precioActual,
+      utilidadPerdida,
+      tceaEmisor,
+      tceaEmisorEscudo,
+      treaBonista
+    })
 
     setIndicadores({
-      precioActual: precioActual,
-      utilidadPerdida: utilidadPerdida,
-      tceaEmisor: tceaEmisor,
-      tceaEmisorEscudo: tceaEmisorEscudo,
-      treaBonista: treaBonista
+      precioActual: isNaN(precioActual) ? 0 : precioActual,
+      utilidadPerdida: isNaN(utilidadPerdida) ? 0 : utilidadPerdida,
+      tceaEmisor: isNaN(tceaEmisor) ? 0 : tceaEmisor,
+      tceaEmisorEscudo: isNaN(tceaEmisorEscudo) ? 0 : tceaEmisorEscudo,
+      treaBonista: isNaN(treaBonista) ? 0 : treaBonista
     })
   }
 

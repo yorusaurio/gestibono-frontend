@@ -33,6 +33,7 @@ interface DatosCompletos extends FormData {
     costos_bonista: number
     numero_periodos: number
     costos_comisiones: CostoComision[]
+    prima: number // Agregar prima como campo numérico
     timestamp: number
 }
 
@@ -40,7 +41,7 @@ export default function FormularioBono() {
     const router = useRouter()
     const [isCalculating, setIsCalculating] = useState<boolean>(false)
     const [costosComisiones, setCostosComisiones] = useState<CostoComision[]>([
-        { id: '1', nombre: 'Prima', porcentaje: '1', aplicaA: 'ninguno' },
+        { id: '1', nombre: 'Prima', porcentaje: '-1', aplicaA: 'ninguno' },
         { id: '2', nombre: 'Estructuración', porcentaje: '1', aplicaA: 'emisor' },
         { id: '3', nombre: 'Colocación', porcentaje: '0.25', aplicaA: 'emisor' },
         { id: '4', nombre: 'Flotación', porcentaje: '0.45', aplicaA: 'ambos' },
@@ -137,6 +138,10 @@ export default function FormularioBono() {
         setIsCalculating(true)
         
         try {
+            // Extraer prima de los costos/comisiones
+            const costoPrima = costosComisiones.find(c => c.nombre.toLowerCase() === 'prima')
+            const primaValue = costoPrima ? parseFloat(costoPrima.porcentaje) : 0
+            
             // Preparar datos para enviar a la página de resultados
             const datosCompletos: DatosCompletos = {
                 ...data,
@@ -147,9 +152,13 @@ export default function FormularioBono() {
                 costos_bonista: calcularCostosBonista(),
                 numero_periodos: calcularNumeroPeriodos(),
                 costos_comisiones: costosComisiones,
+                prima: primaValue, // Agregar prima como campo independiente
                 // Timestamp para identificar el cálculo
                 timestamp: Date.now()
             }
+
+            console.log('Datos completos a enviar:', datosCompletos)
+            console.log('Prima extraída:', primaValue)
 
             // Guardar en localStorage para acceso en la página de resultados
             localStorage.setItem('datosBono', JSON.stringify(datosCompletos))

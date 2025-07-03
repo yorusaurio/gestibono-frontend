@@ -41,7 +41,7 @@ export default function FormularioBono() {
     const router = useRouter()
     const [isCalculating, setIsCalculating] = useState<boolean>(false)
     const [costosComisiones, setCostosComisiones] = useState<CostoComision[]>([
-        { id: '1', nombre: 'Prima', porcentaje: '-1', aplicaA: 'ninguno' },
+        { id: '1', nombre: 'Prima', porcentaje: '1', aplicaA: 'ninguno' },
         { id: '2', nombre: 'Estructuración', porcentaje: '1', aplicaA: 'emisor' },
         { id: '3', nombre: 'Colocación', porcentaje: '0.25', aplicaA: 'emisor' },
         { id: '4', nombre: 'Flotación', porcentaje: '0.45', aplicaA: 'ambos' },

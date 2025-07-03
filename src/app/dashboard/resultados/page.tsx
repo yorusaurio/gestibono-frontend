@@ -50,6 +50,16 @@ export default function ResultadosPage() {
     const primaPorcentaje = parseFloat(prima) / 100 || 0
     const primaValor = valorNominal * primaPorcentaje
 
+    console.log('🎯 DATOS DE PRIMA RECIBIDOS:')
+    console.log(`   - Prima (raw): ${prima}`)
+    console.log(`   - Prima parseada: ${parseFloat(prima)}`)
+    console.log(`   - Prima porcentaje: ${primaPorcentaje} (${(primaPorcentaje * 100).toFixed(2)}%)`)
+    console.log(`   - Valor nominal: ${valorNominal}`)
+    console.log(`   - Prima valor inicial: ${primaValor}`)
+    console.log(`   - Número de períodos: ${numPeriodos}`)
+    console.log(`   - Prima se aplicará solo en período: ${numPeriodos}`)
+    console.log('')
+
     // Calcular tabla período por período - SEGÚN TESTING.TXT
     const tabla = []
     let saldoPendiente = valorNominal
@@ -123,10 +133,25 @@ export default function ResultadosPage() {
 
       // Prima se calcula solo en el último período: =-SI(A26=J$5,D$15*I26,0)
       // Si período actual (i) == total períodos (numPeriodos), entonces prima = primaPorcentaje * bono_indexado_actual
+      console.log(`🎯 CALCULANDO PRIMA - Período ${i}:`)
+      console.log(`   - Es último período? ${i} === ${numPeriodos} → ${i === numPeriodos}`)
+      console.log(`   - Prima porcentaje: ${primaPorcentaje} (${(primaPorcentaje * 100).toFixed(2)}%)`)
+      console.log(`   - Saldo pendiente (bono indexado actual): ${saldoPendiente}`)
+      
       if (i === numPeriodos) {
         // El bono indexado actual es el saldo pendiente ANTES de la amortización
         const bonoIndexadoActual = saldoPendiente
-        primaEnPeriodo = primaPorcentaje * bonoIndexadoActual // Para -1%: -0.01 * 500 = -5.00
+        primaEnPeriodo = -primaPorcentaje * bonoIndexadoActual // Para -1%: -0.01 * 500 = -5.00
+        
+        console.log(`   ✅ ES EL ÚLTIMO PERÍODO - Calculando prima:`)
+        console.log(`   - Bono indexado actual: ${bonoIndexadoActual}`)
+        console.log(`   - Fórmula: ${primaPorcentaje} * ${bonoIndexadoActual} = ${primaEnPeriodo}`)
+        console.log(`   - Prima calculada: ${primaEnPeriodo}`)
+        console.log(`   - Prima esperada (Excel): -5.00`)
+        console.log(`   - ¿Coincide?: ${Math.abs(primaEnPeriodo - (-5.00)) < 0.01 ? '✅ SÍ' : '❌ NO'}`)
+      } else {
+        console.log(`   ❌ NO es el último período - Prima = 0`)
+        console.log(`   - Prima asignada: ${primaEnPeriodo}`)
       }
 
       // Cálculo de cuota según Excel: =SI(A26<=J$5,SI(G26="T",0,SI(G26="P",J26,J26+L26)),0)
@@ -164,6 +189,16 @@ export default function ResultadosPage() {
       
       // Cálculo de flujo bonista: negativo del flujo emisor (a partir del período 1)
       const flujoBonista = -flujoEmisor
+
+      console.log(`📊 RESUMEN PERÍODO ${i}:`)
+      console.log(`   - Interés: ${interes.toFixed(2)}`)
+      console.log(`   - Amortización: ${amortizacion.toFixed(2)}`)
+      console.log(`   - Prima: ${primaEnPeriodo.toFixed(2)} ${primaEnPeriodo !== 0 ? '← ¡CALCULADA!' : ''}`)
+      console.log(`   - Cuota: ${cuota.toFixed(2)}`)
+      console.log(`   - Flujo Emisor: ${flujoEmisor.toFixed(2)}`)
+      console.log(`   - Flujo Bonista: ${flujoBonista.toFixed(2)}`)
+      console.log(`   - Saldo pendiente al final: ${(saldoPendiente - amortizacion).toFixed(2)}`)
+      console.log('')
 
       tabla.push({
         periodo: i,

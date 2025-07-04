@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArrowDownTrayIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
+import { ArrowDownTrayIcon, ArrowLeftIcon, BookmarkIcon, TableCellsIcon, PlusIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 
 export default function ResultadosPage() {
@@ -10,16 +10,20 @@ export default function ResultadosPage() {
   const [tablaBono, setTablaBono] = useState<any[]>([])
   const [indicadores, setIndicadores] = useState<any>({})
   const [loading, setLoading] = useState(true)
+  const [tieneResultados, setTieneResultados] = useState(false)
 
   useEffect(() => {
     const datosBono = localStorage.getItem('datosBono')
     if (!datosBono) {
-      router.push('/dashboard/flujo')
+      // No hay datos de bono para mostrar
+      setTieneResultados(false)
+      setLoading(false)
       return
     }
 
     const datosParseados = JSON.parse(datosBono)
     setDatos(datosParseados)
+    setTieneResultados(true)
     calcularTablaBono(datosParseados)
     setLoading(false)
   }, [router])
@@ -226,7 +230,28 @@ export default function ResultadosPage() {
     setTablaBono(tabla)
 
     // Calcular indicadores según testing.txt
-    calcularIndicadores(tabla, tasaDescuento)
+    console.log('🧮 Calculando indicadores para la tabla...')
+    const indicadoresCalculados = calcularIndicadores(tabla, tasaDescuento)
+    console.log('📊 Indicadores calculados:', indicadoresCalculados)
+    
+    // Actualizar automáticamente el bono con los indicadores calculados si es un cálculo nuevo
+    if (datos && datos.timestamp) {
+      console.log('💾 Intentando actualizar bono con timestamp:', datos.timestamp)
+      actualizarBonoConIndicadores(indicadoresCalculados, datos)
+    } else {
+      console.warn('⚠️ No se puede actualizar: datos o timestamp faltante', {
+        tiene_datos: !!datos,
+        timestamp: datos?.timestamp,
+        datos_completos: datos
+      })
+      
+      // Si no hay timestamp, intentar generar uno temporal basado en el nombre del bono
+      if (datos && datos.nombre && !datos.timestamp) {
+        console.log('🔧 Generando timestamp temporal para bono sin timestamp')
+        datos.timestamp = Date.now()
+        actualizarBonoConIndicadores(indicadoresCalculados, datos)
+      }
+    }
   }
 
   const calcularIndicadores = (tabla: any[], tasaDescuento: number) => {
@@ -475,13 +500,17 @@ export default function ResultadosPage() {
     const treaBonista = treaBonistaDecimal * 100
     console.log(`TREA Bonista: ${treaBonista.toFixed(5)}% (Esperado: 4.63123%)`)
 
-    setIndicadores({
+    const indicadoresCalculados = {
       precioActual: isNaN(precioActual) ? 0 : precioActual,
       utilidadPerdida: isNaN(utilidadPerdida) ? 0 : utilidadPerdida,
       tceaEmisor: isNaN(tceaEmisor) ? 0 : tceaEmisor,
       tceaEmisorEscudo: isNaN(tceaEmisorEscudo) ? 0 : tceaEmisorEscudo,
       treaBonista: isNaN(treaBonista) ? 0 : treaBonista
-    })
+    }
+
+    setIndicadores(indicadoresCalculados)
+    
+    return indicadoresCalculados
   }
 
   const exportarCSV = () => {
@@ -524,12 +553,189 @@ export default function ResultadosPage() {
     link.click()
   }
 
+  const actualizarBonoConIndicadores = (indicadoresCalculados?: any, datosBono?: any) => {
+    console.log('🔧 INICIANDO ACTUALIZACIÓN DE BONO CON INDICADORES')
+    console.log('Indicadores recibidos:', indicadoresCalculados)
+    console.log('Indicadores del estado:', indicadores)
+    console.log('Datos del bono recibidos:', datosBono)
+    console.log('Datos del bono del estado:', datos)
+    
+    try {
+      // Usar los datos pasados como parámetro o los del estado
+      const datosAUsar = datosBono || datos
+      
+      // Si no se proporcionan indicadores, usar los del estado
+      const indicadoresAUsar = indicadoresCalculados || indicadores
+      
+      console.log('🎯 Datos a usar:', datosAUsar)
+      console.log('🎯 Indicadores a usar:', indicadoresAUsar)
+      
+      // Validar que tengamos datos y indicadores válidos
+      if (!datosAUsar) {
+        console.error('❌ No hay datos del bono para actualizar')
+        return
+      }
+      
+      if (!indicadoresAUsar || !indicadoresAUsar.tceaEmisor || !indicadoresAUsar.treaBonista) {
+        console.warn('❌ No hay indicadores válidos para actualizar:', {
+          tiene_indicadores: !!indicadoresAUsar,
+          tiene_tcea: !!indicadoresAUsar?.tceaEmisor,
+          tiene_trea: !!indicadoresAUsar?.treaBonista
+        })
+        return
+      }
+      
+      // Obtener bonos existentes
+      const bonosExistentes = localStorage.getItem('bonosRegistrados')
+      console.log('📦 Bonos existentes en localStorage:', bonosExistentes ? 'Encontrados' : 'No encontrados')
+      
+      const bonos = bonosExistentes ? JSON.parse(bonosExistentes) : []
+      console.log('📊 Total bonos parseados:', bonos.length)
+      
+      // Buscar el bono actual por timestamp
+      const timestamp = datosAUsar.timestamp
+      console.log('🔍 Buscando bono con timestamp:', timestamp)
+      
+      const indiceBonoActual = bonos.findIndex((bono: any) => {
+        if (!bono) {
+          console.log('⚠️ Bono nulo encontrado en la lista, saltando...')
+          return false
+        }
+        const coincide = bono.datos_completos?.timestamp === timestamp
+        console.log(`   Bono "${bono.nombre || 'Sin nombre'}" (${bono.id || 'Sin ID'}): timestamp=${bono.datos_completos?.timestamp}, coincide=${coincide}`)
+        return coincide
+      })
+      
+      console.log('📍 Índice del bono encontrado:', indiceBonoActual)
+      
+      if (indiceBonoActual !== -1) {
+        console.log('✅ Bono encontrado, actualizando indicadores...')
+        
+        // Actualizar el bono existente con los indicadores calculados
+        const indicadoresParaGuardar = {
+          tceaEmisor: Number(indicadoresAUsar.tceaEmisor) || 0,
+          tceaEmisorEscudo: Number(indicadoresAUsar.tceaEmisorEscudo) || 0,
+          treaBonista: Number(indicadoresAUsar.treaBonista) || 0,
+          precioActual: Number(indicadoresAUsar.precioActual) || 0,
+          utilidadPerdida: Number(indicadoresAUsar.utilidadPerdida) || 0
+        }
+        
+        console.log('💾 Indicadores a guardar:', indicadoresParaGuardar)
+        
+        bonos[indiceBonoActual].indicadores = indicadoresParaGuardar
+        
+        // Guardar la lista actualizada
+        localStorage.setItem('bonosRegistrados', JSON.stringify(bonos))
+        console.log('✅ LocalStorage actualizado exitosamente')
+        
+        console.log('🎉 Bono actualizado automáticamente:', {
+          id: bonos[indiceBonoActual].id,
+          nombre: bonos[indiceBonoActual].nombre,
+          indicadores: bonos[indiceBonoActual].indicadores
+        })
+        
+        // Solo mostrar alerta si se llama manualmente
+        if (!indicadoresCalculados) {
+          alert('¡Bono actualizado exitosamente con los indicadores calculados!')
+        }
+      } else {
+        console.warn('❌ No se encontró el bono en la lista para actualizar los indicadores. Timestamp:', timestamp)
+        console.log('🔄 Intentando búsqueda alternativa...')
+        
+        // Intentar buscar por otros criterios si no se encuentra por timestamp
+        const bonoAlternativo = bonos.find((bono: any) => {
+          if (!bono) {
+            console.log('⚠️ Bono nulo encontrado en búsqueda alternativa, saltando...')
+            return false
+          }
+          const coincide = bono.nombre === datosAUsar.nombre && 
+            bono.valor_nominal === datosAUsar.valor_nominal &&
+            bono.numero_periodos === datosAUsar.numero_periodos
+          
+          console.log(`   Búsqueda alternativa - Bono "${bono.nombre || 'Sin nombre'}": coincide=${coincide}`)
+          return coincide
+        })
+        
+        if (bonoAlternativo) {
+          console.log('✅ Bono encontrado por búsqueda alternativa:', bonoAlternativo.nombre)
+          
+          const indiceAlternativo = bonos.indexOf(bonoAlternativo)
+          bonos[indiceAlternativo].indicadores = {
+            tceaEmisor: Number(indicadoresAUsar.tceaEmisor) || 0,
+            tceaEmisorEscudo: Number(indicadoresAUsar.tceaEmisorEscudo) || 0,
+            treaBonista: Number(indicadoresAUsar.treaBonista) || 0,
+            precioActual: Number(indicadoresAUsar.precioActual) || 0,
+            utilidadPerdida: Number(indicadoresAUsar.utilidadPerdida) || 0
+          }
+          
+          localStorage.setItem('bonosRegistrados', JSON.stringify(bonos))
+          console.log('✅ Bono actualizado por criterios alternativos:', bonoAlternativo.nombre)
+        } else {
+          console.error('❌ No se pudo encontrar el bono por ningún criterio')
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error al actualizar el bono:', error)
+      if (!indicadoresCalculados) {
+        alert('Error al actualizar el bono. Por favor, intenta de nuevo.')
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Calculando resultados...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!tieneResultados) {
+    return (
+      <div className="min-h-screen px-6 py-10 bg-gray-100">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <div className="mb-6">
+              <TableCellsIcon className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">No hay resultados disponibles</h1>
+              <p className="text-gray-600">
+                Aún no se han calculado resultados para ningún bono. 
+                Necesitas crear y calcular un bono para ver los indicadores financieros.
+              </p>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-medium text-blue-900 mb-2">¿Cómo empezar?</h3>
+                <ol className="text-left text-sm text-blue-800 space-y-1">
+                  <li>1. Ve al formulario y completa los datos del bono</li>
+                  <li>2. Haz clic en "Calcular Flujo de Caja"</li>
+                  <li>3. Los resultados aparecerán automáticamente aquí</li>
+                  <li>4. Puedes guardar el bono en tu lista desde los resultados</li>
+                </ol>
+              </div>
+              
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="flex items-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  <ArrowLeftIcon className="h-5 w-5" />
+                  Ver Dashboard
+                </button>
+                <button
+                  onClick={() => router.push('/dashboard/flujo')}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <PlusIcon className="h-5 w-5" />
+                  Crear Primer Bono
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -565,15 +771,29 @@ export default function ResultadosPage() {
           </div>
           <div className="flex gap-3">
             <button
+              onClick={() => router.push('/dashboard')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              <ArrowLeftIcon className="h-4 w-4" />
+              Dashboard
+            </button>
+            <button
               onClick={() => router.push('/dashboard/flujo')}
               className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
             >
               <ArrowLeftIcon className="h-4 w-4" />
-              Volver
+              Nuevo Bono
+            </button>
+            <button
+              onClick={() => actualizarBonoConIndicadores(undefined, datos)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              <BookmarkIcon className="h-4 w-4" />
+              Actualizar Bono
             </button>
             <button
               onClick={exportarCSV}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
             >
               <ArrowDownTrayIcon className="h-4 w-4" />
               Exportar CSV

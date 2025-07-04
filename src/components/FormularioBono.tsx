@@ -1,7 +1,7 @@
 'use client'
 
 import { useForm, SubmitHandler } from 'react-hook-form'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
 
@@ -14,6 +14,7 @@ interface CostoComision {
 
 interface FormData {
     // Datos básicos del bono
+    nombre: string // Agregar nombre del bono
     valor_nominal: string
     valor_comercial: string
     nro_anos: string
@@ -40,6 +41,8 @@ interface DatosCompletos extends FormData {
 export default function FormularioBono() {
     const router = useRouter()
     const [isCalculating, setIsCalculating] = useState<boolean>(false)
+    const [isEditing, setIsEditing] = useState<boolean>(false)
+    const [bonoId, setBonoId] = useState<string | null>(null)
     const [costosComisiones, setCostosComisiones] = useState<CostoComision[]>([
         { id: '1', nombre: 'Prima', porcentaje: '1', aplicaA: 'ninguno' },
         { id: '2', nombre: 'Estructuración', porcentaje: '1', aplicaA: 'emisor' },
@@ -52,10 +55,12 @@ export default function FormularioBono() {
         register,
         handleSubmit,
         formState: { errors },
-        watch
+        watch,
+        setValue
     } = useForm<FormData>({
         defaultValues: {
             // Datos básicos del bono
+            nombre: '',
             valor_nominal: '1000',
             valor_comercial: '1050',
             nro_anos: '2',
@@ -68,6 +73,46 @@ export default function FormularioBono() {
             fecha_emision: '2025-06-01',
         }
     })
+
+    // Cargar datos existentes si viene de una edición/duplicación
+    useEffect(() => {
+        const datosBono = localStorage.getItem('datosBono')
+        if (datosBono) {
+            try {
+                const datos = JSON.parse(datosBono)
+                console.log('Datos cargados para edición:', datos)
+                
+                // Cargar datos en el formulario
+                setValue('nombre', datos.nombre || '')
+                setValue('valor_nominal', datos.valor_nominal || '1000')
+                setValue('valor_comercial', datos.valor_comercial || '1050')
+                setValue('nro_anos', datos.nro_anos || '2')
+                setValue('dias_periodo', datos.dias_periodo || '180')
+                setValue('contador_dias', datos.contador_dias || 'ordinario')
+                setValue('dias_ano', datos.dias_ano || '360')
+                setValue('tasa_efectiva_anual', datos.tasa_efectiva_anual || '8')
+                setValue('tasa_descuento_anual', datos.tasa_descuento_anual || '4.5')
+                setValue('impuesto_renta', datos.impuesto_renta || '30')
+                setValue('fecha_emision', datos.fecha_emision || '2025-06-01')
+                
+                // Cargar costos y comisiones si existen
+                if (datos.costos_comisiones) {
+                    setCostosComisiones(datos.costos_comisiones)
+                }
+                
+                // Verificar si es una edición (tiene ID) o duplicación
+                if (datos.id) {
+                    setIsEditing(true)
+                    setBonoId(datos.id)
+                }
+                
+                // Limpiar el localStorage para evitar cargas no deseadas
+                localStorage.removeItem('datosBono')
+            } catch (error) {
+                console.error('Error al cargar datos del bono:', error)
+            }
+        }
+    }, [setValue])
 
     const valores = watch()
 
@@ -160,6 +205,27 @@ export default function FormularioBono() {
             console.log('Datos completos a enviar:', datosCompletos)
             console.log('Prima extraída:', primaValue)
 
+            // Crear el bono para guardar en la lista (solo si es nuevo, no si es edición)
+            if (!isEditing) {
+                const nuevoBono = {
+                    id: Date.now().toString(),
+                    nombre: data.nombre || 'Bono sin nombre',
+                    valor_nominal: parseFloat(data.valor_nominal),
+                    valor_comercial: parseFloat(data.valor_comercial),
+                    numero_periodos: calcularNumeroPeriodos(),
+                    tasa_efectiva_anual: parseFloat(data.tasa_efectiva_anual),
+                    fecha_emision: data.fecha_emision,
+                    fecha_creacion: Date.now(),
+                    datos_completos: datosCompletos // Guardamos todos los datos para poder recrear el bono
+                }
+
+                // Guardar en la lista de bonos registrados
+                const bonosExistentes = localStorage.getItem('bonosRegistrados')
+                const bonos = bonosExistentes ? JSON.parse(bonosExistentes) : []
+                bonos.push(nuevoBono)
+                localStorage.setItem('bonosRegistrados', JSON.stringify(bonos))
+            }
+
             // Guardar en localStorage para acceso en la página de resultados
             localStorage.setItem('datosBono', JSON.stringify(datosCompletos))
             
@@ -186,12 +252,42 @@ export default function FormularioBono() {
 
     return (
         <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold text-gray-900">
+                    {isEditing ? 'Editar Bono' : 'Crear Nuevo Bono'}
+                </h1>
+                <p className="text-gray-600 mt-1">
+                    {isEditing 
+                        ? 'Modifica los parámetros del bono existente' 
+                        : 'Completa los datos para simular el flujo de caja con método alemán'
+                    }
+                </p>
+            </div>
+            
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
                 
                 {/* Datos Básicos del Bono */}
                 <div className="border-b pb-6">
                     <h2 className="text-xl font-semibold text-gray-900 mb-4">Datos Básicos del Bono</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        
+                        <div className="md:col-span-2 lg:col-span-3">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Nombre del Bono <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                {...register('nombre', { 
+                                    required: 'El nombre del bono es obligatorio',
+                                    minLength: { value: 3, message: 'El nombre debe tener al menos 3 caracteres' }
+                                })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Ej: Bono Corporativo ABC - Emisión 2025"
+                            />
+                            {errors.nombre && (
+                                <p className="mt-1 text-sm text-red-600">{errors.nombre.message}</p>
+                            )}
+                        </div>
                         
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -539,13 +635,20 @@ export default function FormularioBono() {
                 </div>
 
                 {/* Botón de envío */}
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-4">
+                    <button
+                        type="button"
+                        onClick={() => router.push('/dashboard')}
+                        className="px-6 py-3 bg-gray-500 text-white font-medium rounded-md hover:bg-gray-600 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                    >
+                        Cancelar
+                    </button>
                     <button
                         type="submit"
                         disabled={isCalculating}
                         className="px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isCalculating ? 'Calculando...' : 'Calcular Flujo de Caja'}
+                        {isCalculating ? 'Calculando...' : (isEditing ? 'Actualizar y Calcular' : 'Calcular Flujo de Caja')}
                     </button>
                 </div>
 

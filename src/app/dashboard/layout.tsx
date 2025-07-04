@@ -1,22 +1,15 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import {
-  ChartBarIcon,
-  DocumentChartBarIcon,
-  PresentationChartLineIcon,
-  UserCircleIcon,
-  ArrowRightOnRectangleIcon
-} from '@heroicons/react/24/outline'
+import { ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
+import Sidebar from '@/components/Sidebar'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const pathname = usePathname()
   const router = useRouter()
   const [nombre, setNombre] = useState('')
 
@@ -28,29 +21,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [])
 
-  const links = [
-    {
-      href: '/dashboard/flujo',
-      label: 'Flujo de Caja',
-      icon: <DocumentChartBarIcon className="h-5 w-5" />
-    },
-    {
-      href: '/dashboard/resultados',
-      label: 'Resultados',
-      icon: <ChartBarIcon className="h-5 w-5" />
-    },
-    {
-      href: '/dashboard/graficos',
-      label: 'Gráficos',
-      icon: <PresentationChartLineIcon className="h-5 w-5" />
-    },
-    {
-      href: '/dashboard/perfil',
-      label: 'Perfil',
-      icon: <UserCircleIcon className="h-5 w-5" />
-    }
-  ]
-
   const handleLogout = () => {
     sessionStorage.clear()
     router.push('/login')
@@ -58,43 +28,32 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 text-white px-5 py-6 flex flex-col justify-between">
-        <div>
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold tracking-wide">GestiBono</h1>
-            <p className="text-sm text-slate-400 mt-1">Hola, {nombre}</p>
+      {/* Usar el componente Sidebar mejorado */}
+      <div className="relative w-64 bg-gradient-to-b from-blue-900 to-blue-800 shadow-xl">
+        <div className="h-full flex flex-col">
+          {/* Sidebar content */}
+          <div className="flex-1">
+            <Sidebar />
           </div>
-
-          <nav className="flex flex-col gap-2">
-            {links.map(({ href, label, icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-3 px-4 py-2 rounded-md transition text-sm font-medium ${
-                  pathname.startsWith(href)
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                {icon}
-                {label}
-              </Link>
-            ))}
-          </nav>
+          
+          {/* User info and logout button */}
+          <div className="p-4 border-t border-blue-700">
+            <div className="text-center mb-3">
+              <p className="text-blue-200 text-xs">Hola, {nombre}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+            >
+              <ArrowRightOnRectangleIcon className="h-4 w-4" />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
-
-        <button
-          onClick={handleLogout}
-          className="mt-6 flex items-center gap-2 px-4 py-2 text-sm text-red-300 hover:text-red-100 hover:bg-red-800/30 rounded transition"
-        >
-          <ArrowRightOnRectangleIcon className="h-5 w-5" />
-          Cerrar sesión
-        </button>
-      </aside>
+      </div>
 
       {/* Contenido principal */}
-      <main className="flex-1 p-6 bg-gray-50">{children}</main>
+      <main className="flex-1 bg-gray-50 p-6">{children}</main>
     </div>
   )
 }

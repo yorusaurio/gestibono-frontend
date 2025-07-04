@@ -79,7 +79,7 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-8 p-4 bg-white bg-opacity-15 rounded-xl backdrop-blur-sm border border-white border-opacity-20">
+      <div className="mt-8 p-4 bg-blue bg-opacity-15 rounded-xl backdrop-blur-sm border border-white border-opacity-20">
         <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
           💡 Método Alemán
         </h3>

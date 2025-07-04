@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   LineChart,
   Line,
@@ -16,12 +16,11 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
-  ComposedChart
+  Cell
 } from 'recharts'
 
 interface GraficoProfesionalProps {
-  datosBono: any
+  datosBono: Record<string, unknown>
   tipo: 'flujo' | 'comparativo' | 'composicion' | 'rendimiento'
 }
 
@@ -34,19 +33,19 @@ const COLORES = {
   prima: '#f59e0b'
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<Record<string, unknown>>; label?: string }) => {
   if (active && payload?.length) {
     return (
       <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-lg">
         <p className="font-semibold text-gray-900 mb-2">Período {label}</p>
-        {payload.map((entry: any, i: number) => (
+        {payload.map((entry: Record<string, unknown>, i: number) => (
           <div key={i} className="flex items-center gap-2 text-sm">
             <div 
               className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: entry.color }}
+              style={{ backgroundColor: String(entry.color) }}
             />
             <span className="text-gray-700">
-              {entry.name}: <span className="font-medium">${entry.value?.toLocaleString()}</span>
+              {String(entry.name)}: <span className="font-medium">${Number(entry.value)?.toLocaleString()}</span>
             </span>
           </div>
         ))}
@@ -57,16 +56,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 }
 
 export default function GraficoProfesional({ datosBono, tipo }: GraficoProfesionalProps) {
-  const [datosGrafico, setDatosGrafico] = useState<any[]>([])
+  const [datosGrafico, setDatosGrafico] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (datosBono) {
-      procesarDatos()
-    }
-  }, [datosBono, tipo])
-
-  const procesarDatos = () => {
+  const procesarDatos = useCallback(() => {
     try {
       // Simular el cálculo de la tabla de flujo de caja
       const {
@@ -80,14 +73,14 @@ export default function GraficoProfesional({ datosBono, tipo }: GraficoProfesion
         impuesto_renta
       } = datosBono
 
-      const valorNominal = parseFloat(valor_nominal) || 0
-      const valorComercial = parseFloat(valor_comercial) || 0
-      const numPeriodos = parseInt(numero_periodos) || 4
-      const tasaPeriodo = parseFloat(tasa_efectiva_periodo) || 0
-      const costosEmisor = parseFloat(costos_emisor) || 0
-      const costosBonista = parseFloat(costos_bonista) || 0
-      const impuesto = parseFloat(impuesto_renta) / 100 || 0
-      const primaPorcentaje = parseFloat(prima) / 100 || 0
+      const valorNominal = parseFloat(String(valor_nominal)) || 0
+      const valorComercial = parseFloat(String(valor_comercial)) || 0
+      const numPeriodos = parseInt(String(numero_periodos)) || 4
+      const tasaPeriodo = parseFloat(String(tasa_efectiva_periodo)) || 0
+      const costosEmisor = parseFloat(String(costos_emisor)) || 0
+      const costosBonista = parseFloat(String(costos_bonista)) || 0
+      const impuesto = parseFloat(String(impuesto_renta)) / 100 || 0
+      const primaPorcentaje = parseFloat(String(prima)) / 100 || 0
       const primaValor = valorNominal * primaPorcentaje
 
       const datos = []
@@ -150,7 +143,13 @@ export default function GraficoProfesional({ datosBono, tipo }: GraficoProfesion
       console.error('Error procesando datos:', error)
       setLoading(false)
     }
-  }
+  }, [datosBono])
+
+  useEffect(() => {
+    if (datosBono) {
+      procesarDatos()
+    }
+  }, [datosBono, procesarDatos])
 
   if (loading) {
     return (

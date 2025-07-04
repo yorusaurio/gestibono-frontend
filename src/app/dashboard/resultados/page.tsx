@@ -1,14 +1,34 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ArrowDownTrayIcon, ArrowLeftIcon, BookmarkIcon, TableCellsIcon, PlusIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 
+interface TablaBonoRow {
+  periodo: number
+  fecha: string
+  nDias: number
+  tasaAjustada: number
+  inflacion: number
+  ip: number
+  gracia: string
+  bono: number
+  bonoIndexado: number
+  cupon: number
+  cuota: number
+  amortizacion: number
+  prima: number
+  escudo: number
+  flujoEmisor: number
+  flujoEmisorEscudo: number
+  flujoBonista: number
+}
+
 export default function ResultadosPage() {
   const router = useRouter()
-  const [datos, setDatos] = useState<any>(null)
-  const [tablaBono, setTablaBono] = useState<any[]>([])
-  const [indicadores, setIndicadores] = useState<any>({})
+  const [datos, setDatos] = useState<Record<string, unknown> | null>(null)
+  const [tablaBono, setTablaBono] = useState<TablaBonoRow[]>([])
+  const [indicadores, setIndicadores] = useState<Record<string, unknown>>({})
   const [loading, setLoading] = useState(true)
   const [tieneResultados, setTieneResultados] = useState(false)
 
@@ -26,9 +46,9 @@ export default function ResultadosPage() {
     setTieneResultados(true)
     calcularTablaBono(datosParseados)
     setLoading(false)
-  }, [router])
+  }, [])
 
-  const calcularTablaBono = (datos: any) => {
+  const calcularTablaBono = useCallback((datos: Record<string, unknown>) => {
     const {
       valor_nominal,
       valor_comercial,
@@ -43,20 +63,20 @@ export default function ResultadosPage() {
       dias_periodo
     } = datos
 
-    const valorNominal = parseFloat(valor_nominal) || 0
-    const valorComercial = parseFloat(valor_comercial) || 0
-    const numPeriodos = parseInt(numero_periodos) || 4
-    const tasaPeriodo = parseFloat(tasa_efectiva_periodo) || 0
-    const tasaDescuento = parseFloat(tasa_descuento_periodo) || 0
-    const costosEmisor = parseFloat(costos_emisor) || 0
-    const costosBonista = parseFloat(costos_bonista) || 0
-    const impuesto = parseFloat(impuesto_renta) / 100 || 0
-    const primaPorcentaje = parseFloat(prima) / 100 || 0
+    const valorNominal = parseFloat(String(valor_nominal)) || 0
+    const valorComercial = parseFloat(String(valor_comercial)) || 0
+    const numPeriodos = parseInt(String(numero_periodos)) || 4
+    const tasaPeriodo = parseFloat(String(tasa_efectiva_periodo)) || 0
+    const tasaDescuento = parseFloat(String(tasa_descuento_periodo)) || 0
+    const costosEmisor = parseFloat(String(costos_emisor)) || 0
+    const costosBonista = parseFloat(String(costos_bonista)) || 0
+    const impuesto = parseFloat(String(impuesto_renta)) / 100 || 0
+    const primaPorcentaje = parseFloat(String(prima)) / 100 || 0
     const primaValor = valorNominal * primaPorcentaje
 
     console.log('🎯 DATOS DE PRIMA RECIBIDOS:')
     console.log(`   - Prima (raw): ${prima}`)
-    console.log(`   - Prima parseada: ${parseFloat(prima)}`)
+    console.log(`   - Prima parseada: ${parseFloat(String(prima))}`)
     console.log(`   - Prima porcentaje: ${primaPorcentaje} (${(primaPorcentaje * 100).toFixed(2)}%)`)
     console.log(`   - Valor nominal: ${valorNominal}`)
     console.log(`   - Prima valor inicial: ${primaValor}`)
@@ -79,8 +99,8 @@ export default function ResultadosPage() {
       return new Date(fechaStr)
     }
     
-    const fechaEmision = parsearFecha(fecha_emision)
-    const diasPorPeriodo = parseInt(dias_periodo)
+    const fechaEmision = parsearFecha(String(fecha_emision))
+    const diasPorPeriodo = parseInt(String(dias_periodo))
 
     // Función para agregar días de forma segura
     const agregarDias = (fecha: Date, dias: number): Date => {
@@ -252,13 +272,13 @@ export default function ResultadosPage() {
         actualizarBonoConIndicadores(indicadoresCalculados, datos)
       }
     }
-  }
+  }, [])
 
-  const calcularIndicadores = (tabla: any[], tasaDescuento: number) => {
+  const calcularIndicadores = (tabla: Array<Record<string, unknown>>, tasaDescuento: number) => {
     // Extraer flujos para cálculos - según testing.txt
-    const flujosBonista = tabla.map((row: any) => row.flujoBonista)
-    const flujosEmisor = tabla.map((row: any) => row.flujoEmisor)
-    const flujosEmisorEscudo = tabla.map((row: any) => row.flujoEmisorEscudo)
+    const flujosBonista = tabla.map((row: Record<string, unknown>) => Number(row.flujoBonista))
+    const flujosEmisor = tabla.map((row: Record<string, unknown>) => Number(row.flujoEmisor))
+    const flujosEmisorEscudo = tabla.map((row: Record<string, unknown>) => Number(row.flujoEmisorEscudo))
 
     console.log('🔍 ANÁLISIS DE FLUJOS PARA INDICADORES:')
     console.log('Flujos Bonista:', flujosBonista)
@@ -469,9 +489,9 @@ export default function ResultadosPage() {
     console.log('\n🏦 CALCULANDO XIRR PARA CADA FLUJO:')
     
     // Extraer fechas de la tabla
-    const fechas = tabla.map((row: any) => {
+    const fechas = tabla.map((row: Record<string, unknown>) => {
       // Parsear la fecha desde el formato de la tabla
-      const fechaStr = row.fecha // formato: "dd/mm/yyyy"
+      const fechaStr = String(row.fecha) // formato: "dd/mm/yyyy"
       const [dia, mes, ano] = fechaStr.split('/').map(Number)
       return new Date(ano, mes - 1, dia) // mes - 1 porque Date usa 0-indexing
     })
@@ -522,14 +542,14 @@ export default function ResultadosPage() {
       'ESCUDO', 'FLUJO EMISOR', 'FLUJO EMISOR C/ESCUDO', 'FLUJO BONISTA'
     ]
 
-    const filas = tablaBono.map((row: any) => [
-      row.periodo,
-      row.fecha,
-      row.nDias,
+    const filas = tablaBono.map((row: TablaBonoRow) => [
+      String(row.periodo),
+      String(row.fecha),
+      String(row.nDias),
       (row.tasaAjustada * 100).toFixed(5) + '%',
       (row.inflacion * 100).toFixed(2) + '%',
       (row.ip * 100).toFixed(3) + '%',
-      row.gracia,
+      String(row.gracia),
       row.bono.toFixed(2),
       row.bonoIndexado.toFixed(2),
       row.cupon.toFixed(2),
@@ -553,7 +573,7 @@ export default function ResultadosPage() {
     link.click()
   }
 
-  const actualizarBonoConIndicadores = (indicadoresCalculados?: any, datosBono?: any) => {
+  const actualizarBonoConIndicadores = useCallback((indicadoresCalculados?: Record<string, unknown>, datosBono?: Record<string, unknown>) => {
     console.log('🔧 INICIANDO ACTUALIZACIÓN DE BONO CON INDICADORES')
     console.log('Indicadores recibidos:', indicadoresCalculados)
     console.log('Indicadores del estado:', indicadores)
@@ -596,13 +616,13 @@ export default function ResultadosPage() {
       const timestamp = datosAUsar.timestamp
       console.log('🔍 Buscando bono con timestamp:', timestamp)
       
-      const indiceBonoActual = bonos.findIndex((bono: any) => {
+      const indiceBonoActual = bonos.findIndex((bono: Record<string, unknown>) => {
         if (!bono) {
           console.log('⚠️ Bono nulo encontrado en la lista, saltando...')
           return false
         }
-        const coincide = bono.datos_completos?.timestamp === timestamp
-        console.log(`   Bono "${bono.nombre || 'Sin nombre'}" (${bono.id || 'Sin ID'}): timestamp=${bono.datos_completos?.timestamp}, coincide=${coincide}`)
+        const coincide = (bono.datos_completos as Record<string, unknown>)?.timestamp === timestamp
+        console.log(`   Bono "${String(bono.nombre) || 'Sin nombre'}" (${String(bono.id) || 'Sin ID'}): timestamp=${(bono.datos_completos as Record<string, unknown>)?.timestamp}, coincide=${coincide}`)
         return coincide
       })
       
@@ -649,16 +669,16 @@ export default function ResultadosPage() {
         console.log('🔄 Intentando búsqueda alternativa...')
         
         // Intentar buscar por otros criterios si no se encuentra por timestamp
-        const bonoAlternativo = bonos.find((bono: any) => {
+        const bonoAlternativo = bonos.find((bono: Record<string, unknown>) => {
           if (!bono) {
             console.log('⚠️ Bono nulo encontrado en búsqueda alternativa, saltando...')
             return false
           }
-          const coincide = bono.nombre === datosAUsar.nombre && 
-            bono.valor_nominal === datosAUsar.valor_nominal &&
-            bono.numero_periodos === datosAUsar.numero_periodos
+          const coincide = String(bono.nombre) === String(datosAUsar.nombre) && 
+            Number(bono.valor_nominal) === Number(datosAUsar.valor_nominal) &&
+            Number(bono.numero_periodos) === Number(datosAUsar.numero_periodos)
           
-          console.log(`   Búsqueda alternativa - Bono "${bono.nombre || 'Sin nombre'}": coincide=${coincide}`)
+          console.log(`   Búsqueda alternativa - Bono "${String(bono.nombre) || 'Sin nombre'}": coincide=${coincide}`)
           return coincide
         })
         
@@ -692,7 +712,7 @@ export default function ResultadosPage() {
         alert('Error al actualizar el bono. Por favor, intenta de nuevo.')
       }
     }
-  }
+  }, [])
 
   if (loading) {
     return (
@@ -724,7 +744,7 @@ export default function ResultadosPage() {
                 <h3 className="font-medium text-blue-900 mb-2">¿Cómo empezar?</h3>
                 <ol className="text-left text-sm text-blue-800 space-y-1">
                   <li>1. Ve al formulario y completa los datos del bono</li>
-                  <li>2. Haz clic en "Calcular Flujo de Caja"</li>
+                  <li>2. Haz clic en &quot;Calcular Flujo de Caja&quot;</li>
                   <li>3. Los resultados aparecerán automáticamente aquí</li>
                   <li>4. Puedes guardar el bono en tu lista desde los resultados</li>
                 </ol>
@@ -819,27 +839,27 @@ export default function ResultadosPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="font-medium text-black">Valor Nominal:</span>
-              <span className="ml-2 text-black">{parseFloat(datos.valor_nominal).toLocaleString()}</span>
+              <span className="ml-2 text-black">{parseFloat(String(datos.valor_nominal)).toLocaleString()}</span>
             </div>
             <div>
               <span className="font-medium text-black">Valor Comercial:</span>
-              <span className="ml-2 text-black">{parseFloat(datos.valor_comercial).toLocaleString()}</span>
+              <span className="ml-2 text-black">{parseFloat(String(datos.valor_comercial)).toLocaleString()}</span>
             </div>
             <div>
               <span className="font-medium text-black">Períodos:</span>
-              <span className="ml-2 text-black">{datos.numero_periodos}</span>
+              <span className="ml-2 text-black">{String(datos.numero_periodos)}</span>
             </div>
             <div>
               <span className="font-medium text-black">Tasa Efectiva:</span>
-              <span className="ml-2 text-black">{(datos.tasa_efectiva_periodo * 100).toFixed(5)}%</span>
+              <span className="ml-2 text-black">{(Number(datos.tasa_efectiva_periodo) * 100).toFixed(5)}%</span>
             </div>
             <div>
               <span className="font-medium text-black">Costos Emisor:</span>
-              <span className="ml-2 text-black">{datos.costos_emisor.toFixed(2)}</span>
+              <span className="ml-2 text-black">{Number(datos.costos_emisor).toFixed(2)}</span>
             </div>
             <div>
               <span className="font-medium text-black">Costos Bonista:</span>
-              <span className="ml-2 text-black">{datos.costos_bonista.toFixed(2)}</span>
+              <span className="ml-2 text-black">{Number(datos.costos_bonista).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -850,27 +870,27 @@ export default function ResultadosPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="font-medium text-blue-900">Precio Actual</h3>
-              <p className="text-2xl font-bold text-blue-600">{indicadores.precioActual?.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-blue-600">{typeof indicadores.precioActual === 'number' ? indicadores.precioActual.toFixed(2) : 'N/A'}</p>
               <p className="text-xs text-blue-700">Esperado: 1061.10</p>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
               <h3 className="font-medium text-green-900">Utilidad/Pérdida</h3>
-              <p className="text-2xl font-bold text-green-600">{indicadores.utilidadPerdida?.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-green-600">{typeof indicadores.utilidadPerdida === 'number' ? indicadores.utilidadPerdida.toFixed(2) : 'N/A'}</p>
               <p className="text-xs text-green-700">Esperado: 1.13</p>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg">
               <h3 className="font-medium text-purple-900">TCEA Emisor</h3>
-              <p className="text-2xl font-bold text-purple-600">{indicadores.tceaEmisor?.toFixed(5)}%</p>
+              <p className="text-2xl font-bold text-purple-600">{typeof indicadores.tceaEmisor === 'number' ? indicadores.tceaEmisor.toFixed(5) + '%' : 'N/A'}</p>
               <p className="text-xs text-purple-700">Esperado: 6.66299%</p>
             </div>
             <div className="bg-indigo-50 p-4 rounded-lg">
               <h3 className="font-medium text-indigo-900">TCEA c/Escudo</h3>
-              <p className="text-2xl font-bold text-indigo-600">{indicadores.tceaEmisorEscudo?.toFixed(5)}%</p>
+              <p className="text-2xl font-bold text-indigo-600">{typeof indicadores.tceaEmisorEscudo === 'number' ? indicadores.tceaEmisorEscudo.toFixed(5) + '%' : 'N/A'}</p>
               <p className="text-xs text-indigo-700">Esperado: 4.26000%</p>
             </div>
             <div className="bg-orange-50 p-4 rounded-lg">
               <h3 className="font-medium text-orange-900">TREA Bonista</h3>
-              <p className="text-2xl font-bold text-orange-600">{indicadores.treaBonista?.toFixed(5)}%</p>
+              <p className="text-2xl font-bold text-orange-600">{typeof indicadores.treaBonista === 'number' ? indicadores.treaBonista.toFixed(5) + '%' : 'N/A'}</p>
               <p className="text-xs text-orange-700">Esperado: 4.63123%</p>
             </div>
           </div>
@@ -905,7 +925,7 @@ export default function ResultadosPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {tablaBono.map((row: any, index: number) => (
+                {tablaBono.map((row: TablaBonoRow, index: number) => (
                   <tr key={index} className={index === 0 ? 'bg-blue-50' : 'hover:bg-gray-50'}>
                     <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.periodo}</td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">{row.fecha}</td>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   PlusIcon, 
@@ -21,7 +21,7 @@ interface BonoRegistrado {
   tasa_efectiva_anual: number
   fecha_emision: string
   fecha_creacion: number
-  datos_completos?: any // Datos completos del formulario para recrear el bono
+  datos_completos?: Record<string, unknown> // Datos completos del formulario para recrear el bono
   indicadores?: {
     tceaEmisor: number
     tceaEmisorEscudo: number
@@ -69,7 +69,7 @@ export default function DashboardHome() {
     }
   }, [])
 
-  const cargarBonos = () => {
+  const cargarBonos = useCallback(() => {
     try {
       const bonosGuardados = localStorage.getItem('bonosRegistrados')
       console.log('🔍 Raw localStorage data:', bonosGuardados)
@@ -80,7 +80,7 @@ export default function DashboardHome() {
         console.log('📈 Total bonos encontrados:', bonosParseados.length)
         
         // Filtrar bonos nulos o inválidos
-        const bonosValidos = bonosParseados.filter((bono: any) => {
+        const bonosValidos = bonosParseados.filter((bono: BonoRegistrado) => {
           if (!bono) {
             console.warn('⚠️ Bono nulo encontrado, eliminando...')
             return false
@@ -118,7 +118,7 @@ export default function DashboardHome() {
           // Actualizar fecha de emisión desde datos completos si está disponible
           if (bono.datos_completos?.fecha_emision && bono.fecha_emision !== bono.datos_completos.fecha_emision) {
             console.log(`📅 Actualizando fecha de emisión para ${bono.nombre}: ${bono.fecha_emision} → ${bono.datos_completos.fecha_emision}`)
-            bono.fecha_emision = bono.datos_completos.fecha_emision
+            bono.fecha_emision = String(bono.datos_completos.fecha_emision)
             huboCalculos = true
           }
         })
@@ -138,7 +138,7 @@ export default function DashboardHome() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   const eliminarBono = (id: string) => {
     console.log('🗑️ Intentando eliminar bono con ID:', id)
@@ -202,51 +202,51 @@ export default function DashboardHome() {
     }
   }
 
-  const repararIndicadoresBonos = async () => {
-    console.log('🔧 INICIANDO REPARACIÓN DE INDICADORES PARA TODOS LOS BONOS')
-    
-    if (bonos.length === 0) {
-      alert('No hay bonos para reparar')
-      return
-    }
+  // const repararIndicadoresBonos = async () => {
+  //   console.log('🔧 INICIANDO REPARACIÓN DE INDICADORES PARA TODOS LOS BONOS')
+  //   
+  //   if (bonos.length === 0) {
+  //     alert('No hay bonos para reparar')
+  //     return
+  //   }
 
-    let bonosReparados = 0
-    
-    for (const bono of bonos) {
-      if (!bono.indicadores?.treaBonista && bono.datos_completos) {
-        console.log(`🔄 Reparando bono: ${bono.nombre}`)
-        
-        // Simular cálculo de indicadores (valores de ejemplo basados en los datos del bono)
-        const indicadoresReparados = {
-          tceaEmisor: 6.66299, // Valor típico basado en los cálculos
-          tceaEmisorEscudo: 4.26000,
-          treaBonista: 4.63123,
-          precioActual: 1061.10,
-          utilidadPerdida: 1.13
-        }
-        
-        // Actualizar el bono directamente
-        const bonosExistentes = localStorage.getItem('bonosRegistrados')
-        const todosLosBonos = bonosExistentes ? JSON.parse(bonosExistentes) : []
-        
-        const indiceBono = todosLosBonos.findIndex((b: any) => b.id === bono.id)
-        if (indiceBono !== -1) {
-          todosLosBonos[indiceBono].indicadores = indicadoresReparados
-          localStorage.setItem('bonosRegistrados', JSON.stringify(todosLosBonos))
-          bonosReparados++
-          console.log(`✅ Bono ${bono.nombre} reparado con indicadores`)
-        }
-      }
-    }
-    
-    if (bonosReparados > 0) {
-      alert(`✅ Se repararon ${bonosReparados} bonos con indicadores de ejemplo. Recarga la página para ver los cambios.`)
-      // Recargar bonos
-      cargarBonos()
-    } else {
-      alert('No se encontraron bonos que necesiten reparación')
-    }
-  }
+  //   let bonosReparados = 0
+  //   
+  //   for (const bono of bonos) {
+  //     if (!bono.indicadores?.treaBonista && bono.datos_completos) {
+  //       console.log(`🔄 Reparando bono: ${bono.nombre}`)
+  //       
+  //       // Simular cálculo de indicadores (valores de ejemplo basados en los datos del bono)
+  //       const indicadoresReparados = {
+  //         tceaEmisor: 6.66299, // Valor típico basado en los cálculos
+  //         tceaEmisorEscudo: 4.26000,
+  //         treaBonista: 4.63123,
+  //         precioActual: 1061.10,
+  //         utilidadPerdida: 1.13
+  //       }
+  //       
+  //       // Actualizar el bono directamente
+  //       const bonosExistentes = localStorage.getItem('bonosRegistrados')
+  //       const todosLosBonos = bonosExistentes ? JSON.parse(bonosExistentes) : []
+  //       
+  //       const indiceBono = todosLosBonos.findIndex((b: any) => b.id === bono.id)
+  //       if (indiceBono !== -1) {
+  //         todosLosBonos[indiceBono].indicadores = indicadoresReparados
+  //         localStorage.setItem('bonosRegistrados', JSON.stringify(todosLosBonos))
+  //         bonosReparados++
+  //         console.log(`✅ Bono ${bono.nombre} reparado con indicadores`)
+  //       }
+  //     }
+  //   }
+  //   
+  //   if (bonosReparados > 0) {
+  //     alert(`✅ Se repararon ${bonosReparados} bonos con indicadores de ejemplo. Recarga la página para ver los cambios.`)
+  //     // Recargar bonos
+  //     cargarBonos()
+  //   } else {
+  //     alert('No se encontraron bonos que necesiten reparación')
+  //   }
+  // }
 
   const duplicarBono = (bono: BonoRegistrado) => {
     if (!bono || !bono.datos_completos) {
@@ -320,29 +320,29 @@ export default function DashboardHome() {
 
   const stats = calcularEstadisticas()
 
-  const calcularIndicadoresAutomaticos = (datosBono: any) => {
+  const calcularIndicadoresAutomaticos = (datosBono: Record<string, unknown>) => {
     try {
       const {
         valor_nominal,
         valor_comercial,
         numero_periodos,
         tasa_efectiva_periodo,
-        tasa_descuento_periodo,
+        // tasa_descuento_periodo,
         costos_emisor,
         costos_bonista,
-        impuesto_renta,
-        prima
+        impuesto_renta
+        // prima
       } = datosBono
 
-      const valorNominal = parseFloat(valor_nominal) || 0
-      const valorComercial = parseFloat(valor_comercial) || 0
-      const numPeriodos = parseInt(numero_periodos) || 4
-      const tasaPeriodo = parseFloat(tasa_efectiva_periodo) || 0
-      const tasaDescuento = parseFloat(tasa_descuento_periodo) || 0
-      const costosEmisor = parseFloat(costos_emisor) || 0
-      const costosBonista = parseFloat(costos_bonista) || 0
-      const impuesto = parseFloat(impuesto_renta) / 100 || 0
-      const primaValue = parseFloat(prima) || 0
+      const valorNominal = parseFloat(String(valor_nominal)) || 0
+      const valorComercial = parseFloat(String(valor_comercial)) || 0
+      const numPeriodos = parseInt(String(numero_periodos)) || 4
+      const tasaPeriodo = parseFloat(String(tasa_efectiva_periodo)) || 0
+      // const tasaDescuento = parseFloat(tasa_descuento_periodo) || 0
+      const costosEmisor = parseFloat(String(costos_emisor)) || 0
+      const costosBonista = parseFloat(String(costos_bonista)) || 0
+      const impuesto = parseFloat(String(impuesto_renta)) / 100 || 0
+      // const primaValue = parseFloat(prima) || 0
 
       // Cálculo simplificado de indicadores
       // Estos son valores aproximados basados en la lógica del método alemán

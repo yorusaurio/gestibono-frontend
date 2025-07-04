@@ -42,7 +42,7 @@ export default function FormularioBono() {
     const router = useRouter()
     const [isCalculating, setIsCalculating] = useState<boolean>(false)
     const [isEditing, setIsEditing] = useState<boolean>(false)
-    const [bonoId, setBonoId] = useState<string | null>(null)
+    // const [bonoId, setBonoId] = useState<string | null>(null)
     const [costosComisiones, setCostosComisiones] = useState<CostoComision[]>([
         { id: '1', nombre: 'Prima', porcentaje: '1', aplicaA: 'ninguno' },
         { id: '2', nombre: 'Estructuración', porcentaje: '1', aplicaA: 'emisor' },
@@ -103,7 +103,7 @@ export default function FormularioBono() {
                 // Verificar si es una edición (tiene ID) o duplicación
                 if (datos.id) {
                     setIsEditing(true)
-                    setBonoId(datos.id)
+                    // setBonoId(datos.id)
                 }
                 
                 // Limpiar el localStorage para evitar cargas no deseadas
@@ -560,7 +560,7 @@ export default function FormularioBono() {
                         
                         {costosComisiones.length === 0 && (
                             <div className="text-center py-8 text-gray-500">
-                                <p>No hay costos agregados. Haz clic en "Agregar Costo" para comenzar.</p>
+                                <p>No hay costos agregados. Haz clic en &quot;Agregar Costo&quot; para comenzar.</p>
                             </div>
                         )}
                     </div>

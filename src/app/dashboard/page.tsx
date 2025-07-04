@@ -114,6 +114,13 @@ export default function DashboardHome() {
             huboCalculos = true
             console.log(`✅ Indicadores calculados para ${bono.nombre}:`, nuevosIndicadores)
           }
+          
+          // Actualizar fecha de emisión desde datos completos si está disponible
+          if (bono.datos_completos?.fecha_emision && bono.fecha_emision !== bono.datos_completos.fecha_emision) {
+            console.log(`📅 Actualizando fecha de emisión para ${bono.nombre}: ${bono.fecha_emision} → ${bono.datos_completos.fecha_emision}`)
+            bono.fecha_emision = bono.datos_completos.fecha_emision
+            huboCalculos = true
+          }
         })
         
         // Si se filtraron bonos inválidos o se calcularon nuevos indicadores, actualizar localStorage
@@ -378,6 +385,21 @@ export default function DashboardHome() {
     }
   }
 
+  // Función para parsear fecha de forma segura (evita problemas de zona horaria)
+  const formatearFecha = (fechaStr: string): string => {
+    if (!fechaStr) return ''
+    
+    // Si viene en formato YYYY-MM-DD, parseamos manualmente
+    if (fechaStr.includes('-')) {
+      const [year, month, day] = fechaStr.split('-').map(Number)
+      const fecha = new Date(year, month - 1, day) // month - 1 porque Date usa 0-indexing
+      return fecha.toLocaleDateString('es-ES')
+    }
+    
+    // Para otros formatos, usar Date normal
+    return new Date(fechaStr).toLocaleDateString('es-ES')
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -466,7 +488,7 @@ export default function DashboardHome() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Inversión Total</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">${stats.totalInversion.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">S/.{stats.totalInversion.toLocaleString()}</p>
               <p className="text-xs text-gray-500 mt-1">Capital del portafolio</p>
             </div>
             <div className="p-2 bg-yellow-100 rounded-lg">
@@ -552,7 +574,7 @@ export default function DashboardHome() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${bono.valor_nominal.toLocaleString()}
+                      S/.{bono.valor_nominal.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {bono.numero_periodos}
@@ -591,7 +613,7 @@ export default function DashboardHome() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(bono.fecha_emision).toLocaleDateString('es-ES')}
+                      {formatearFecha(bono.fecha_emision)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex gap-1">

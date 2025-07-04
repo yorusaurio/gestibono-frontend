@@ -624,6 +624,12 @@ export default function ResultadosPage() {
         
         bonos[indiceBonoActual].indicadores = indicadoresParaGuardar
         
+        // También actualizar la fecha de emisión si está disponible en los datos
+        if (datosAUsar.fecha_emision && bonos[indiceBonoActual].fecha_emision !== datosAUsar.fecha_emision) {
+          console.log(`📅 Actualizando fecha de emisión: ${bonos[indiceBonoActual].fecha_emision} → ${datosAUsar.fecha_emision}`)
+          bonos[indiceBonoActual].fecha_emision = datosAUsar.fecha_emision
+        }
+        
         // Guardar la lista actualizada
         localStorage.setItem('bonosRegistrados', JSON.stringify(bonos))
         console.log('✅ LocalStorage actualizado exitosamente')
@@ -666,6 +672,12 @@ export default function ResultadosPage() {
             treaBonista: Number(indicadoresAUsar.treaBonista) || 0,
             precioActual: Number(indicadoresAUsar.precioActual) || 0,
             utilidadPerdida: Number(indicadoresAUsar.utilidadPerdida) || 0
+          }
+          
+          // También actualizar la fecha de emisión si está disponible
+          if (datosAUsar.fecha_emision && bonos[indiceAlternativo].fecha_emision !== datosAUsar.fecha_emision) {
+            console.log(`📅 Actualizando fecha de emisión (búsqueda alternativa): ${bonos[indiceAlternativo].fecha_emision} → ${datosAUsar.fecha_emision}`)
+            bonos[indiceAlternativo].fecha_emision = datosAUsar.fecha_emision
           }
           
           localStorage.setItem('bonosRegistrados', JSON.stringify(bonos))
